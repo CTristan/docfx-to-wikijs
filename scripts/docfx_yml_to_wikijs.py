@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-import yaml
+import yaml  # type: ignore
 
 # -----------------------------
 # Utilities
@@ -93,6 +93,9 @@ class LinkTarget:
 
 def load_managed_reference(path: Path) -> Dict[str, Any]:
     raw = strip_yaml_mime_header(path.read_text(encoding="utf-8"))
+    # Fix unquoted equals sign in VB names which confuses PyYAML
+    # Matches: "  name.vb: =" -> "  name.vb: '='"
+    raw = re.sub(r"^(\s*[\w\.]+\.vb:\s+)(=$)", r"\1'='", raw, flags=re.MULTILINE)
     doc = yaml.safe_load(raw)
     return doc or {}
 
@@ -107,7 +110,7 @@ def build_index(yml_files: List[Path]) -> Dict[str, ItemInfo]:
     for f in yml_files:
         doc = load_managed_reference(f)
         for it in iter_main_items(doc):
-            uid = it.get("uid")
+            uid = str(it.get("uid"))
             kind = str(it.get("type") or "").strip() or "Unknown"
             name = it.get("name") or it.get("fullName") or uid
             full_name = it.get("fullName") or it.get("name") or uid
@@ -276,7 +279,7 @@ def render_type_page(
     def fmt_type_list(uids: List[Any]) -> List[str]:
         out: List[str] = []
         for u in uids:
-            uid = u.get("uid") if isinstance(u, dict) else str(u)
+            uid = str(u.get("uid")) if isinstance(u, dict) else str(u)
             t = uid_targets.get(uid)
             out.append(f"[{t.title}]({t.page_path})" if t else f"`{uid}`")
         return out
@@ -421,8 +424,8 @@ def render_type_page(
         parts += ["## See also"]
         for s in seealso:
             suid = s.get("uid") if isinstance(s, dict) else None
-            if suid and suid in uid_targets:
-                t = uid_targets[suid]
+            if suid and str(suid) in uid_targets:
+                t = uid_targets[str(suid)]
                 parts.append(f"- [{t.title}]({t.page_path})")
             else:
                 parts.append(f"- {rewrite_xrefs(as_text(s), uid_targets)}")
