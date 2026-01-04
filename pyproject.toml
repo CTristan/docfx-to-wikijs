@@ -1,0 +1,12 @@
+[project]
+name = "docfx"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mypy>=1.19.1",
+    "pyyaml>=6.0.3",
+    "ruff>=0.14.10",
+    "types-pyyaml>=6.0.12.20250915",
+]

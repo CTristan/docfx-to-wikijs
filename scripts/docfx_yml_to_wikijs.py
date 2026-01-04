@@ -1,0 +1,530 @@
+from __future__ import annotations
+
+import argparse
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+import yaml
+
+# -----------------------------
+# Utilities
+# -----------------------------
+
+YAML_MIME_PREFIX = "### YamlMime:"
+XREF_TAG_RE = re.compile(r"<xref:([^?>#>]+)(?:\?[^>#>]*)?(?:#[^>]*)?>")
+XREF_MD_LINK_RE = re.compile(r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)")  # (xref:UID?...)
+
+# Conservative: keep dots (for your dotted filenames), letters, digits, underscore, dash.
+DOT_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+def strip_yaml_mime_header(text: str) -> str:
+    lines = text.splitlines()
+    if lines and lines[0].startswith(YAML_MIME_PREFIX):
+        return "\n".join(lines[1:]).lstrip("\n")
+    return text
+
+def as_text(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, list):
+        return "\n".join(as_text(x) for x in v if as_text(x))
+    return str(v).strip()
+
+def dot_safe(name: str) -> str:
+    """
+    Make a stable filename-ish token but keep dots for your desired layout.
+    Also normalize nested types and generics markers.
+    """
+    name = name.replace("+", ".")      # nested types Outer+Inner -> Outer.Inner
+    name = name.replace("`", "")       # generics Foo`1 -> Foo1-ish
+    name = DOT_SAFE_RE.sub("-", name).strip("-")
+    # Avoid pathological emptiness
+    return name or "Unknown"
+
+def header_slug(s: str) -> str:
+    """
+    GitHub-ish anchor slug: lower, hyphenate non-alnum.
+    """
+    s = s.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s or "section"
+
+def md_codeblock(lang: str, code: str) -> str:
+    return f"```{lang}\n{code.rstrip()}\n```"
+
+def md_table(headers: List[str], rows: List[List[str]]) -> str:
+    if not rows:
+        return ""
+    out = ["| " + " | ".join(headers) + " |",
+           "| " + " | ".join(["---"] * len(headers)) + " |"]
+    for r in rows:
+        out.append("| " + " | ".join(r) + " |")
+    return "\n".join(out)
+
+# -----------------------------
+# Data model
+# -----------------------------
+
+@dataclass
+class ItemInfo:
+    uid: str
+    kind: str                    # Namespace/Class/Method/Property/etc.
+    name: str
+    full_name: str
+    parent: Optional[str]
+    namespace: Optional[str]
+    summary: str
+    file: Path
+    raw: Dict[str, Any]          # original parsed item
+
+@dataclass(frozen=True)
+class LinkTarget:
+    title: str
+    page_path: str               # Wiki path, e.g. /api/Foo.Bar
+
+# -----------------------------
+# Parsing and indexing
+# -----------------------------
+
+def load_managed_reference(path: Path) -> Dict[str, Any]:
+    raw = strip_yaml_mime_header(path.read_text(encoding="utf-8"))
+    doc = yaml.safe_load(raw)
+    return doc or {}
+
+def iter_main_items(doc: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+    items = doc.get("items") or []
+    for it in items:
+        if isinstance(it, dict) and it.get("uid"):
+            yield it
+
+def build_index(yml_files: List[Path]) -> Dict[str, ItemInfo]:
+    uid_to_item: Dict[str, ItemInfo] = {}
+    for f in yml_files:
+        doc = load_managed_reference(f)
+        for it in iter_main_items(doc):
+            uid = it.get("uid")
+            kind = str(it.get("type") or "").strip() or "Unknown"
+            name = it.get("name") or it.get("fullName") or uid
+            full_name = it.get("fullName") or it.get("name") or uid
+            parent = it.get("parent")
+            ns = it.get("namespace")
+            summary = as_text(it.get("summary"))
+            uid_to_item[uid] = ItemInfo(
+                uid=uid,
+                kind=kind,
+                name=str(name),
+                full_name=str(full_name),
+                parent=str(parent) if parent else None,
+                namespace=str(ns) if ns else None,
+                summary=summary,
+                file=f,
+                raw=it
+            )
+    return uid_to_item
+
+def namespace_of(item: ItemInfo) -> str:
+    # Prefer explicit namespace field.
+    if item.namespace:
+        return item.namespace
+    # Try derive from full_name if it looks dotted.
+    parts = item.full_name.split(".")
+    if len(parts) >= 2:
+        return ".".join(parts[:-1])
+    return ""
+
+def is_type_kind(kind: str) -> bool:
+    k = kind.lower()
+    return k in {"class", "struct", "interface", "enum", "delegate"}
+
+def is_namespace_kind(kind: str) -> bool:
+    return kind.lower() == "namespace"
+
+def is_member_kind(kind: str) -> bool:
+    k = kind.lower()
+    return k in {"method", "property", "field", "event", "operator", "constructor"}
+
+def page_path_for_fullname(api_root: str, full_name: str) -> str:
+    # Your preferred dotted filenames: Foo.Bar.Baz -> /api/Foo.Bar.Baz
+    return f"{api_root}/{dot_safe(full_name)}"
+
+def output_file_for_page(out_root: Path, page_path: str) -> Path:
+    # /api/Foo.Bar -> out_root/api/Foo.Bar.md
+    rel = page_path.lstrip("/") + ".md"
+    p = out_root / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+# -----------------------------
+# XRef rewriting
+# -----------------------------
+
+def build_link_targets(uid_to_item: Dict[str, ItemInfo], api_root: str) -> Dict[str, LinkTarget]:
+    targets: Dict[str, LinkTarget] = {}
+    for uid, item in uid_to_item.items():
+        # Link "page" targets for namespaces and types. (Members are inline.)
+        if is_namespace_kind(item.kind) or is_type_kind(item.kind):
+            page = page_path_for_fullname(api_root, item.full_name)
+            title = item.name or item.full_name or uid
+            targets[uid] = LinkTarget(title=title, page_path=page)
+    return targets
+
+def rewrite_xrefs(text: str, uid_targets: Dict[str, LinkTarget]) -> str:
+    if not text:
+        return ""
+
+    # <xref:UID> -> [Title](/api/...)
+    def repl_tag(m: re.Match) -> str:
+        uid = m.group(1)
+        t = uid_targets.get(uid)
+        if not t:
+            return f"`{uid}`"
+        return f"[{t.title}]({t.page_path})"
+
+    text = XREF_TAG_RE.sub(repl_tag, text)
+
+    # (xref:UID) -> (/api/...)
+    def repl_link(m: re.Match) -> str:
+        uid = m.group(2)
+        t = uid_targets.get(uid)
+        if not t:
+            return "(#)"
+        return f"({t.page_path})"
+
+    text = XREF_MD_LINK_RE.sub(repl_link, text)
+    return text
+
+# -----------------------------
+# Rendering: Namespace pages
+# -----------------------------
+
+def render_namespace_page(
+    ns_fullname: str,
+    types_in_ns: List[ItemInfo],
+    child_namespaces: List[str],
+    uid_targets: Dict[str, LinkTarget],
+    api_root: str
+) -> str:
+    title = ns_fullname or "(global namespace)"
+    parts: List[str] = [f"# {title}", ""]
+
+    # Summary: DocFX namespaces typically have minimal summary; keep it simple.
+    parts += ["## Overview", "API elements under this namespace.", ""]
+
+    if child_namespaces:
+        parts += ["## Namespaces"]
+        for child in sorted(child_namespaces):
+            parts.append(f"- [{child}]({page_path_for_fullname(api_root, child)})")
+        parts.append("")
+
+    if types_in_ns:
+        parts += ["## Types"]
+        # DocFX-ish: list types with short summaries
+        for t in sorted(types_in_ns, key=lambda x: x.full_name.lower()):
+            page = page_path_for_fullname(api_root, t.full_name)
+            summ = rewrite_xrefs(t.summary, uid_targets).replace("\n", " ").strip()
+            if summ:
+                parts.append(f"- [{t.name}]({page}) — {summ}")
+            else:
+                parts.append(f"- [{t.name}]({page})")
+        parts.append("")
+
+    return "\n".join(parts).rstrip() + "\n"
+
+# -----------------------------
+# Rendering: Type pages (DocFX-ish)
+# -----------------------------
+
+def render_type_page(
+    item: ItemInfo,
+    uid_to_item: Dict[str, ItemInfo],
+    uid_targets: Dict[str, LinkTarget],
+    api_root: str,
+    include_member_details: bool = True
+) -> str:
+    raw = item.raw
+    ns = namespace_of(item)
+    ns_page = page_path_for_fullname(api_root, ns) if ns else ""
+
+    parts: List[str] = [f"# {item.full_name}", ""]
+
+    # Breadcrumb-ish line (DocFX does this visually; we do it textually)
+    if ns:
+        parts.append(f"**Namespace:** [{ns}]({ns_page})")
+        parts.append("")
+
+    # Summary
+    summary = rewrite_xrefs(as_text(raw.get("summary")), uid_targets)
+    if summary:
+        parts += ["## Summary", summary, ""]
+
+    # Definition (DocFX-ish section title)
+    syntax = raw.get("syntax") or {}
+    sig = as_text(syntax.get("content"))
+    if sig:
+        parts += ["## Definition", "", md_codeblock("csharp", sig), ""]
+
+    # Inheritance / Implements / Derived (DocFX has these blocks on type pages)
+    inheritance = raw.get("inheritance") or []
+    implements = raw.get("implements") or []
+    derived = raw.get("derivedClasses") or []
+
+    def fmt_type_list(uids: List[Any]) -> List[str]:
+        out: List[str] = []
+        for u in uids:
+            uid = u.get("uid") if isinstance(u, dict) else str(u)
+            t = uid_targets.get(uid)
+            out.append(f"[{t.title}]({t.page_path})" if t else f"`{uid}`")
+        return out
+
+    if inheritance:
+        chain = " → ".join(fmt_type_list(inheritance))
+        parts += ["## Inheritance", chain, ""]
+
+    if implements:
+        impl = ", ".join(fmt_type_list(implements))
+        parts += ["## Implements", impl, ""]
+
+    if derived:
+        der = ", ".join(fmt_type_list(derived))
+        parts += ["## Derived", der, ""]
+
+    # Remarks / Examples
+    remarks = rewrite_xrefs(as_text(raw.get("remarks")), uid_targets)
+    if remarks:
+        parts += ["## Remarks", remarks, ""]
+
+    example = rewrite_xrefs(as_text(raw.get("example")), uid_targets)
+    if example:
+        parts += ["## Examples", example, ""]
+
+    # Members (group by kind; include list + optional details)
+    members = [m for m in uid_to_item.values() if m.parent == item.uid and is_member_kind(m.kind)]
+
+    if members:
+        parts += ["## Members", ""]
+
+        def member_key(m: ItemInfo) -> Tuple[str, str]:
+            # group ordering: constructors, properties, methods, events, fields, operators
+            order = {
+                "constructor": "0",
+                "property": "1",
+                "method": "2",
+                "event": "3",
+                "field": "4",
+                "operator": "5",
+            }
+            k = m.kind.lower()
+            return (order.get(k, "9"), m.full_name.lower())
+
+        members_sorted = sorted(members, key=member_key)
+
+        # Summary list with anchors
+        for m in members_sorted:
+            anchor = header_slug(m.name or m.full_name)
+            summ = rewrite_xrefs(m.summary, uid_targets).replace("\n", " ").strip()
+            if summ:
+                parts.append(f"- [{m.name}](#{anchor}) — {summ}")
+            else:
+                parts.append(f"- [{m.name}](#{anchor})")
+        parts.append("")
+
+        if include_member_details:
+            parts += ["---", ""]
+            current_group: Optional[str] = None
+
+            for m in members_sorted:
+                group = m.kind.capitalize()
+                if group != current_group:
+                    parts += [f"## {group}s", ""]
+                    current_group = group
+
+                # Member heading
+                parts.append(f"### {m.name}")
+                parts.append("")
+
+                mraw = m.raw
+                msyn = mraw.get("syntax") or {}
+                msig = as_text(msyn.get("content"))
+                if msig:
+                    parts.append(md_codeblock("csharp", msig))
+                    parts.append("")
+
+                msumm = rewrite_xrefs(as_text(mraw.get("summary")), uid_targets)
+                if msumm:
+                    parts.append(msumm)
+                    parts.append("")
+
+                # Parameters
+                params = msyn.get("parameters") or []
+                if params:
+                    rows: List[List[str]] = []
+                    for p in params:
+                        pname = str(p.get("id") or p.get("name") or "")
+                        ptype = rewrite_xrefs(as_text(p.get("type")), uid_targets)
+                        pdesc = rewrite_xrefs(as_text(p.get("description")), uid_targets)
+                        rows.append([f"`{pname}`", f"`{ptype}`" if ptype else "", pdesc])
+                    parts.append("**Parameters**")
+                    parts.append("")
+                    parts.append(md_table(["Name", "Type", "Description"], rows))
+                    parts.append("")
+
+                # Returns
+                ret = msyn.get("return") or {}
+                rtype = rewrite_xrefs(as_text(ret.get("type")), uid_targets)
+                rdesc = rewrite_xrefs(as_text(ret.get("description")), uid_targets)
+                if rtype or rdesc:
+                    parts.append("**Returns**")
+                    parts.append("")
+                    if rtype:
+                        parts.append(f"- **Type:** `{rtype}`")
+                    if rdesc:
+                        parts.append(f"- {rdesc}")
+                    parts.append("")
+
+                # Exceptions
+                exc = mraw.get("exceptions") or []
+                if exc:
+                    parts.append("**Exceptions**")
+                    parts.append("")
+                    for e in exc:
+                        et = rewrite_xrefs(as_text(e.get("type")), uid_targets)
+                        ed = rewrite_xrefs(as_text(e.get("description")), uid_targets)
+                        if et and ed:
+                            parts.append(f"- `{et}` — {ed}")
+                        elif et:
+                            parts.append(f"- `{et}`")
+                    parts.append("")
+
+                # Remarks / Example for member
+                mrem = rewrite_xrefs(as_text(mraw.get("remarks")), uid_targets)
+                if mrem:
+                    parts.append("**Remarks**")
+                    parts.append("")
+                    parts.append(mrem)
+                    parts.append("")
+
+                mex = rewrite_xrefs(as_text(mraw.get("example")), uid_targets)
+                if mex:
+                    parts.append("**Examples**")
+                    parts.append("")
+                    parts.append(mex)
+                    parts.append("")
+
+    # See also
+    seealso = raw.get("seealso") or raw.get("seeAlso") or []
+    if seealso:
+        parts += ["## See also"]
+        for s in seealso:
+            suid = s.get("uid") if isinstance(s, dict) else None
+            if suid and suid in uid_targets:
+                t = uid_targets[suid]
+                parts.append(f"- [{t.title}]({t.page_path})")
+            else:
+                parts.append(f"- {rewrite_xrefs(as_text(s), uid_targets)}")
+        parts.append("")
+
+    return "\n".join(parts).rstrip() + "\n"
+
+# -----------------------------
+# Main
+# -----------------------------
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish layout).")
+    ap.add_argument("yml_dir", type=Path, help="Directory containing DocFX *.yml (ManagedReference) files")
+    ap.add_argument("out_dir", type=Path, help="Output directory (a git repo root for Wiki.js Git storage)")
+    ap.add_argument("--api-root", default="/api", help="Wiki path root for generated pages (default: /api)")
+    ap.add_argument("--include-namespace-pages", action="store_true", help="Generate foo.md, foo.bar.md namespace landing pages")
+    ap.add_argument("--include-member-details", action="store_true", help="Inline member sections (constructors/methods/etc.) on type pages")
+    ap.add_argument("--home-page", action="store_true", help="Generate a simple Home page (home.md)")
+    args = ap.parse_args()
+
+    yml_files = sorted(args.yml_dir.rglob("*.yml"))
+    if not yml_files:
+        raise SystemExit(f"No .yml files found under: {args.yml_dir}")
+
+    uid_to_item = build_index(yml_files)
+    uid_targets = build_link_targets(uid_to_item, args.api_root)
+
+    out_root = args.out_dir.resolve()
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    # Collect types by namespace for optional namespace pages
+    ns_to_types: Dict[str, List[ItemInfo]] = {}
+    for it in uid_to_item.values():
+        if is_type_kind(it.kind):
+            ns = namespace_of(it)
+            ns_to_types.setdefault(ns, []).append(it)
+
+    # Build namespace graph for child namespace listing
+    # ns "foo.bar" has parent "foo"
+    ns_children: Dict[str, set[str]] = {}
+    all_namespaces = set(ns_to_types.keys())
+    for ns in list(all_namespaces):
+        if not ns:
+            continue
+        parts = ns.split(".")
+        for i in range(1, len(parts)):
+            parent = ".".join(parts[:i])
+            child = ".".join(parts[:i+1])
+            ns_children.setdefault(parent, set()).add(child)
+        # Ensure top-level exists
+        ns_children.setdefault(parts[0], ns_children.get(parts[0], set()))
+
+    # Write type pages (one per type UID)
+    written = 0
+    for it in uid_to_item.values():
+        if not is_type_kind(it.kind):
+            continue
+        page_path = page_path_for_fullname(args.api_root, it.full_name)
+        md = render_type_page(
+            it,
+            uid_to_item=uid_to_item,
+            uid_targets=uid_targets,
+            api_root=args.api_root,
+            include_member_details=args.include_member_details,
+        )
+        out_file = output_file_for_page(out_root, page_path)
+        out_file.write_text(md, encoding="utf-8")
+        written += 1
+
+    # Namespace pages (optional)
+    if args.include_namespace_pages:
+        for ns, types in sorted(ns_to_types.items(), key=lambda kv: kv[0].lower()):
+            if not ns:
+                continue  # optional: skip global ns page
+            page_path = page_path_for_fullname(args.api_root, ns)
+            children = sorted(ns_children.get(ns, set()))
+            md = render_namespace_page(
+                ns_fullname=ns,
+                types_in_ns=types,
+                child_namespaces=children,
+                uid_targets=uid_targets,
+                api_root=args.api_root
+            )
+            out_file = output_file_for_page(out_root, page_path)
+            out_file.write_text(md, encoding="utf-8")
+            written += 1
+
+    # Home page (optional)
+    if args.home_page:
+        home = [
+            "# Home",
+            "",
+            "This wiki was initially generated from DocFX metadata and is now editable.",
+            "",
+            f"- Browse the API under `{args.api_root}`",
+            ""
+        ]
+        (out_root / "home.md").write_text("\n".join(home), encoding="utf-8")
+
+    print(f"Generated {written} Markdown pages into: {out_root}")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
