@@ -1,9 +1,12 @@
+"""Development script to run checks (linting, types, tests) and the main application."""
+
 import argparse
 import subprocess
 import sys
 
 
 def run_command(command, step_name) -> None:
+    """Run a shell command as a step in the development process."""
     print(f"\n--- Running Step: {step_name} ---")
     print(f"$ {' '.join(command)}")
     try:
@@ -14,6 +17,7 @@ def run_command(command, step_name) -> None:
 
 
 def main() -> None:
+    """Run the development checks and optionally the main script."""
     parser = argparse.ArgumentParser(
         description="Run development checks and main script."
     )

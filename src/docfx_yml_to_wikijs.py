@@ -1,3 +1,10 @@
+"""Convert DocFX YAML metadata to Wiki.js compatible Markdown.
+
+This module processes DocFX ManagedReference YAML files and generates a static site
+structure suitable for Wiki.js, including type pages, namespace indexes, and a
+home page.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -26,6 +33,7 @@ DOT_SAFE_RE = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 def strip_yaml_mime_header(text: str) -> str:
+    """Remove the DocFX YAML MIME header from the content."""
     lines = text.splitlines()
     if lines and lines[0].startswith(YAML_MIME_PREFIX):
         return "\n".join(lines[1:]).lstrip("\n")
@@ -33,6 +41,7 @@ def strip_yaml_mime_header(text: str) -> str:
 
 
 def as_text(v: Any) -> str:
+    """Convert a value to a string, handling lists and None."""
     if v is None:
         return ""
     if isinstance(v, str):
@@ -43,8 +52,10 @@ def as_text(v: Any) -> str:
 
 
 def dot_safe(name: str) -> str:
-    """Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js
-    compatibility. Also normalize nested types and generics markers.
+    """Make a stable filename-ish token.
+
+    Replaces dots with hyphens for Wiki.js compatibility. Also normalize nested types
+    and generics markers.
     """
     name = name.replace("+", "-")  # nested types Outer+Inner -> Outer-Inner
     name = name.replace("`", "")  # generics Foo`1 -> Foo1-ish
@@ -55,7 +66,7 @@ def dot_safe(name: str) -> str:
 
 
 def header_slug(s: str) -> str:
-    """GitHub-ish anchor slug: lower, hyphenate non-alnum."""
+    """Generate a GitHub-ish anchor slug: lower, hyphenate non-alnum."""
     s = s.strip().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     s = re.sub(r"-{2,}", "-", s).strip("-")
@@ -63,10 +74,12 @@ def header_slug(s: str) -> str:
 
 
 def md_codeblock(lang: str, code: str) -> str:
+    """Generate a Markdown code block."""
     return f"```{lang}\n{code.rstrip()}\n```"
 
 
 def md_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Generate a Markdown table."""
     if not rows:
         return ""
     out = [
@@ -85,6 +98,8 @@ def md_table(headers: list[str], rows: list[list[str]]) -> str:
 
 @dataclass
 class ItemInfo:
+    """Represents a documented item (class, method, etc.)."""
+
     uid: str
     kind: str  # Namespace/Class/Method/Property/etc.
     name: str
@@ -98,6 +113,8 @@ class ItemInfo:
 
 @dataclass(frozen=True)
 class LinkTarget:
+    """Represents a link target for an XRef."""
+
     title: str
     page_path: str  # Wiki path, e.g. /api/Foo.Bar
 
@@ -108,15 +125,17 @@ class LinkTarget:
 
 
 def load_managed_reference(path: Path) -> dict[str, Any]:
+    """Load and parse a DocFX ManagedReference YAML file."""
     raw = strip_yaml_mime_header(path.read_text(encoding="utf-8"))
     # Fix unquoted equals sign in VB names which confuses PyYAML
-    # Matches: "  name.vb: =" -> "  name.vb: '='"
+    # Matches: "  name.vb: =" -> "  name.vb: '='
     raw = re.sub(r"^(\s*[\w\.]+\.vb:\s+)(=$)", r"\1'='", raw, flags=re.MULTILINE)
     doc = yaml.safe_load(raw)
     return doc or {}
 
 
 def iter_main_items(doc: dict[str, Any]) -> Iterable[dict[str, Any]]:
+    """Iterate over the main items in a DocFX YAML document."""
     items = doc.get("items") or []
     for it in items:
         if isinstance(it, dict) and it.get("uid"):
@@ -126,6 +145,7 @@ def iter_main_items(doc: dict[str, Any]) -> Iterable[dict[str, Any]]:
 def build_index(
     yml_files: list[Path],
 ) -> tuple[dict[str, ItemInfo], dict[str, dict[str, Any]]]:
+    """Index all DocFX YAML files to build a map of UIDs to items and references."""
     uid_to_item: dict[str, ItemInfo] = {}
     uid_to_ref: dict[str, dict[str, Any]] = {}
     for f in yml_files:
@@ -156,6 +176,7 @@ def build_index(
 
 
 def namespace_of(item: ItemInfo) -> str:
+    """Determine the namespace of an item."""
     # Prefer explicit namespace field.
     if item.namespace:
         return item.namespace
@@ -167,25 +188,30 @@ def namespace_of(item: ItemInfo) -> str:
 
 
 def is_type_kind(kind: str) -> bool:
+    """Check if the kind represents a type (class, struct, etc.)."""
     k = kind.lower()
     return k in {"class", "struct", "interface", "enum", "delegate"}
 
 
 def is_namespace_kind(kind: str) -> bool:
+    """Check if the kind represents a namespace."""
     return kind.lower() == "namespace"
 
 
 def is_member_kind(kind: str) -> bool:
+    """Check if the kind represents a member (method, property, etc.)."""
     k = kind.lower()
     return k in {"method", "property", "field", "event", "operator", "constructor"}
 
 
 def page_path_for_fullname(api_root: str, full_name: str) -> str:
+    """Generate the Wiki.js page path for a given full name."""
     # Flattened hyphenated filenames: Foo.Bar.Baz -> /api/Foo-Bar-Baz
     return f"{api_root}/{dot_safe(full_name)}"
 
 
 def output_file_for_page(out_root: Path, page_path: str) -> Path:
+    """Determine the output file path for a given Wiki.js page path."""
     # /api/Foo.Bar -> out_root/api/Foo.Bar.md
     rel = page_path.lstrip("/") + ".md"
     p = out_root / rel
@@ -203,6 +229,7 @@ def build_link_targets(
     uid_to_ref: dict[str, dict[str, Any]],
     api_root: str,
 ) -> dict[str, LinkTarget]:
+    """Build a map of UIDs to link targets."""
     targets: dict[str, LinkTarget] = {}
 
     # 1. Internal types and namespaces (pages)
@@ -237,6 +264,7 @@ def build_link_targets(
 
 
 def rewrite_xrefs(text: str, uid_targets: dict[str, LinkTarget]) -> str:
+    """Rewrite DocFX XRef tags to Markdown links."""
     if not text:
         return ""
 
@@ -273,6 +301,7 @@ def render_namespace_page(
     uid_targets: dict[str, LinkTarget],
     api_root: str,
 ) -> str:
+    """Render a namespace landing page in Markdown."""
     parts: list[str] = [f"# Namespace {ns_fullname}", ""]
 
     if child_namespaces:
@@ -322,6 +351,7 @@ def render_type_page(
     api_root: str,
     include_member_details: bool = True,
 ) -> str:
+    """Render a type page (class, struct, etc.) in Markdown."""
     raw = item.raw
     ns = namespace_of(item)
 
@@ -534,6 +564,7 @@ def render_type_page(
 
 
 def main() -> int:
+    """Run the conversion process."""
     ap = argparse.ArgumentParser(
         description=(
             "Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish "

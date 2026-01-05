@@ -4,7 +4,7 @@
 target-version = "py312"
 
 [lint]
-select = ["B", "E", "F", "Q"]
+select = ["B", "D", "E", "F", "Q", "T"]
 ignore = [
     "COM812", # Causes conflicts with formatter
     "D203", # Incompatible formatting

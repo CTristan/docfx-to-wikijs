@@ -1,3 +1,5 @@
+"""Main orchestration script for generating DocFX metadata and Wiki.js documentation."""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,7 @@ def run_command(cmd_list, cwd=None) -> None:
 
 
 def main() -> None:
+    """Run the full documentation generation pipeline."""
     root_dir = Path(__file__).parent
 
     # 1. Generate YAML metadata using dotnet docfx

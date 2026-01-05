@@ -1,3 +1,5 @@
+"""Tests for the docfx_yml_to_wikijs module."""
+
 import os
 import sys
 from pathlib import Path
@@ -16,6 +18,7 @@ from docfx_yml_to_wikijs import (
 
 
 def test_strip_yaml_mime_header() -> None:
+    """Test stripping the YamlMime header."""
     content = "### YamlMime:ManagedReference\nitems:\n  - uid: Foo"
     expected = "items:\n  - uid: Foo"
     assert strip_yaml_mime_header(content) == expected
@@ -25,6 +28,7 @@ def test_strip_yaml_mime_header() -> None:
 
 
 def test_dot_safe() -> None:
+    """Test safe filename generation."""
     assert dot_safe("System.String") == "System-String"
     assert dot_safe("List`1") == "List1"
     assert dot_safe("Map<T>") == "Map-T"
@@ -33,6 +37,7 @@ def test_dot_safe() -> None:
 
 
 def test_header_slug() -> None:
+    """Test header anchor slug generation."""
     assert header_slug("My Header") == "my-header"
     assert header_slug("Header with 123") == "header-with-123"
     assert header_slug("Complex!@#Header") == "complex-header"
@@ -40,6 +45,7 @@ def test_header_slug() -> None:
 
 
 def test_as_text() -> None:
+    """Test text conversion utility."""
     assert as_text(None) == ""
     assert as_text(" Hello ") == "Hello"
     assert as_text([" A ", " B "]) == "A\nB"
@@ -47,6 +53,7 @@ def test_as_text() -> None:
 
 
 def test_md_codeblock() -> None:
+    """Test code block generation."""
     from docfx_yml_to_wikijs import md_codeblock
 
     assert md_codeblock("csharp", "var x = 1;") == "```csharp\nvar x = 1;\n```"
@@ -54,6 +61,7 @@ def test_md_codeblock() -> None:
 
 
 def test_md_table() -> None:
+    """Test Markdown table generation."""
     from docfx_yml_to_wikijs import md_table
 
     assert md_table([], []) == ""
@@ -65,6 +73,7 @@ def test_md_table() -> None:
 
 
 def test_kind_predicates() -> None:
+    """Test item kind predicate functions."""
     from docfx_yml_to_wikijs import is_member_kind, is_namespace_kind, is_type_kind
 
     assert is_type_kind("Class")
@@ -83,6 +92,7 @@ def test_kind_predicates() -> None:
 
 
 def test_namespace_of() -> None:
+    """Test namespace extraction logic."""
     from docfx_yml_to_wikijs import ItemInfo, namespace_of
 
     # Mock ItemInfo since we just need simple attribute access
@@ -132,6 +142,7 @@ def test_namespace_of() -> None:
 
 
 def test_page_path_for_fullname() -> None:
+    """Test wiki page path generation."""
     from docfx_yml_to_wikijs import page_path_for_fullname
 
     assert (
@@ -142,6 +153,7 @@ def test_page_path_for_fullname() -> None:
 
 
 def test_build_link_targets() -> None:
+    """Test building link targets from items and references."""
     from docfx_yml_to_wikijs import ItemInfo, build_link_targets
 
     # Mock data
@@ -194,6 +206,7 @@ def test_build_link_targets() -> None:
 
 
 def test_rewrite_xrefs() -> None:
+    """Test rewriting XRef tags to Markdown links."""
     from docfx_yml_to_wikijs import LinkTarget, rewrite_xrefs
 
     targets = {
@@ -217,6 +230,7 @@ def test_rewrite_xrefs() -> None:
 
 
 def test_load_managed_reference(tmp_path) -> None:
+    """Test loading a ManagedReference YAML file."""
     from docfx_yml_to_wikijs import load_managed_reference
 
     f = tmp_path / "test.yml"
@@ -229,6 +243,7 @@ def test_load_managed_reference(tmp_path) -> None:
 
 
 def test_iter_main_items() -> None:
+    """Test iterating over main items in a document."""
     from docfx_yml_to_wikijs import iter_main_items
 
     doc = {
@@ -246,6 +261,7 @@ def test_iter_main_items() -> None:
 
 
 def test_render_namespace_page() -> None:
+    """Test rendering a namespace page."""
     from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_namespace_page
 
     # Setup
@@ -285,6 +301,7 @@ def test_render_namespace_page() -> None:
 
 
 def test_render_type_page() -> None:
+    """Test rendering a type page."""
     from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_type_page
 
     # Setup
@@ -378,6 +395,7 @@ def test_render_type_page() -> None:
 
 
 def test_main_integration(tmp_path) -> None:
+    """Test the main function with mocked arguments."""
     import sys
     from unittest.mock import patch
 
@@ -387,14 +405,13 @@ def test_main_integration(tmp_path) -> None:
     src = tmp_path / "src"
     src.mkdir()
     (src / "test.yml").write_text(
-        """### YamlMime:ManagedReference
-items:
-  - uid: My.Class
-    type: Class
-    name: Class
-    fullName: My.Class
-    summary: Summary
-""",
+        "### YamlMime:ManagedReference\n"
+        "items:\n"
+        "  - uid: My.Class\n"
+        "    type: Class\n"
+        "    name: Class\n"
+        "    fullName: My.Class\n"
+        "    summary: Summary\n",
         encoding="utf-8",
     )
 
