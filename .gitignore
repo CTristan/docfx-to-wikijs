@@ -3,6 +3,7 @@ _site/
 api/
 obj/
 assemblies/
+wikijs_out/
 
 # Python
 __pycache__/
