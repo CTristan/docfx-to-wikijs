@@ -30,9 +30,14 @@ uv run python main.py
 ```
 
 #### Development Cycle (Recommended)
-To run the full development pipeline (Linting -> Type Checking -> Build):
+To run the full development pipeline (Formatting -> Linting -> Type Checking -> Unit Tests -> Build):
 ```bash
 uv run python dev.py
+```
+
+To run only the CI checks (Formatting -> Linting -> Type Checking -> Unit Tests) without executing the main build script:
+```bash
+uv run python dev.py --ci
 ```
 
 #### Documentation Build (Standard DocFX)

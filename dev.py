@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 import sys
 
@@ -13,19 +14,43 @@ def run_command(command, step_name) -> None:
 
 
 def main() -> None:
-    # 1. Run Ruff
+    parser = argparse.ArgumentParser(
+        description="Run development checks and main script."
+    )
+    parser.add_argument(
+        "--ci", action="store_true", help="Run checks and tests only, skipping main.py"
+    )
+    args = parser.parse_args()
+
+    # 1. Run Ruff Format
+    run_command(
+        ["uv", "run", "ruff", "format"],
+        "Ruff Formatting",
+    )
+
+    # 2. Run Ruff
     run_command(
         ["uv", "run", "ruff", "check", "--fix", "--unsafe-fixes"],
         "Ruff Linting & Fixes",
     )
 
-    # 2. Run Mypy
+    # 3. Run Mypy
     run_command(
         ["uv", "run", "mypy", "."],
         "Mypy Type Checking",
     )
 
-    # 3. Run main.py
+    # 4. Run Pytest
+    run_command(
+        ["uv", "run", "pytest"],
+        "Pytest Unit Tests",
+    )
+
+    if args.ci:
+        print("\n✅ CI checks passed successfully. Skipping execution of main.py.")
+        return
+
+    # 5. Run main.py
     run_command(
         ["uv", "run", "python", "main.py"],
         "Main Entry Point",
