@@ -301,7 +301,11 @@ def render_type_page(
 
     assemblies = raw.get("assemblies")
     if assemblies:
-        parts.append(f"**Assembly:** {', '.join(assemblies)}.dll")
+        formatted_assemblies = [
+            a if str(a).lower().endswith(".dll") else f"{a}.dll"
+            for a in assemblies
+        ]
+        parts.append(f"**Assembly:** {', '.join(formatted_assemblies)}")
     parts.append("")
 
     # Attributes
