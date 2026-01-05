@@ -643,8 +643,6 @@ def render_type_page(
 
     return "\n".join(parts).rstrip() + "\n"
 
-    return "\n".join(parts).rstrip() + "\n"
-
 
 # -----------------------------
 # Main
