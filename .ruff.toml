@@ -9,7 +9,7 @@ ignore = [
     "COM812", # Causes conflicts with formatter
     "D203", # Incompatible formatting
     "D213", # Incompatible formatting
-    "T201" # Print needed for CLI
+    "T201", # Print needed for CLI
 ]
 
 [lint.per-file-ignores]
