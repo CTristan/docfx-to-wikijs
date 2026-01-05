@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Add the scripts directory to sys.path so we can import the module
 # This is necessary because the script is in a subdirectory and not installed as a package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../scripts")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from docfx_yml_to_wikijs import (
     as_text,
