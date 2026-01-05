@@ -66,3 +66,4 @@ uv run python dev.py
 - **Output Naming**: Generated Markdown files use hyphens instead of periods for namespaces and types (e.g., `My-Namespace-Class.md`) to ensure compatibility with Wiki.js, which restricts special characters in page paths.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
+- **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
