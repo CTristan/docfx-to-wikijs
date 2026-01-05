@@ -2,7 +2,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-def run_command(cmd_list, cwd=None):
+
+def run_command(cmd_list, cwd=None) -> None:
     """Run a command and exit if it fails."""
     cmd_str = " ".join(str(x) for x in cmd_list)
     print(f"Running: {cmd_str}")
@@ -12,9 +13,10 @@ def run_command(cmd_list, cwd=None):
         print(f"Error executing command: {cmd_str}")
         sys.exit(e.returncode)
 
-def main():
+
+def main() -> None:
     root_dir = Path(__file__).parent
-    
+
     # 1. Generate YAML metadata using dotnet docfx
     print("--- Step 1: Generating DocFX metadata ---")
     # This command looks for docfx.json in the current directory by default
@@ -25,7 +27,7 @@ def main():
     script_path = root_dir / "scripts" / "docfx_yml_to_wikijs.py"
     yml_dir = root_dir / "api"
     out_dir = root_dir / "wikijs_out"
-    
+
     # Using the current python interpreter
     python_exe = sys.executable
 
@@ -37,12 +39,14 @@ def main():
         "--include-namespace-pages",
         "--include-member-details",
         "--home-page",
-        "--api-root", "/api"
+        "--api-root",
+        "/api",
     ]
-    
+
     run_command(cmd)
-    
+
     print(f"\nSUCCESS: Documentation generated in {out_dir}")
+
 
 if __name__ == "__main__":
     main()

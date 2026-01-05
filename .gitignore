@@ -2,7 +2,9 @@
 _site/
 api/
 obj/
-assemblies/
+assemblies/*
+!assemblies/README.txt
+wikijs_out/
 
 # Python
 __pycache__/
