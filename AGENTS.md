@@ -57,5 +57,6 @@ uv run mypy .
 ## Conventions
 - **API Generation**: The project relies on `assemblies/Assembly-CSharp.dll` as the primary source for API documentation. Avoid manually editing generated files in `api/` unless you are sure they won't be overwritten.
 - **Conversion Logic**: Modifications to the Wiki.js output format should be made in `scripts/docfx_yml_to_wikijs.py`.
+- **Output Naming**: Generated Markdown files use hyphens instead of periods for namespaces and types (e.g., `My-Namespace-Class.md`) to ensure compatibility with Wiki.js, which restricts special characters in page paths.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.

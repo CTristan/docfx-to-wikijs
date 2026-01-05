@@ -16,8 +16,8 @@ YAML_MIME_PREFIX = "### YamlMime:"
 XREF_TAG_RE = re.compile(r"<xref:([^?>#>]+)(?:\?[^>#>]*)?(?:#[^>]*)?>")
 XREF_MD_LINK_RE = re.compile(r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)")  # (xref:UID?...)
 
-# Conservative: keep dots (for your dotted filenames), letters, digits, underscore, dash.
-DOT_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+# Conservative: keep letters, digits, underscore, dash. Dots are replaced with hyphens.
+DOT_SAFE_RE = re.compile(r"[^A-Za-z0-9_-]+")
 
 def strip_yaml_mime_header(text: str) -> str:
     lines = text.splitlines()
@@ -36,10 +36,10 @@ def as_text(v: Any) -> str:
 
 def dot_safe(name: str) -> str:
     """
-    Make a stable filename-ish token but keep dots for your desired layout.
+    Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js compatibility.
     Also normalize nested types and generics markers.
     """
-    name = name.replace("+", ".")      # nested types Outer+Inner -> Outer.Inner
+    name = name.replace("+", "-")      # nested types Outer+Inner -> Outer-Inner
     name = name.replace("`", "")       # generics Foo`1 -> Foo1-ish
     name = DOT_SAFE_RE.sub("-", name).strip("-")
     # Avoid pathological emptiness
@@ -156,7 +156,7 @@ def is_member_kind(kind: str) -> bool:
     return k in {"method", "property", "field", "event", "operator", "constructor"}
 
 def page_path_for_fullname(api_root: str, full_name: str) -> str:
-    # Your preferred dotted filenames: Foo.Bar.Baz -> /api/Foo.Bar.Baz
+    # Flattened hyphenated filenames: Foo.Bar.Baz -> /api/Foo-Bar-Baz
     return f"{api_root}/{dot_safe(full_name)}"
 
 def output_file_for_page(out_root: Path, page_path: str) -> Path:
@@ -291,7 +291,8 @@ def render_type_page(
         ns_links = []
         curr = ""
         for p in ns_parts:
-            if curr: curr += "."
+            if curr:
+                curr += "."
             curr += p
             t = uid_targets.get(curr)
             ns_links.append(f"[{p}]({t.page_path})" if t else p)
@@ -381,11 +382,16 @@ def render_type_page(
 
         for m in members_sorted:
             group = m.kind.capitalize()
-            if group == "Constructor": group = "Constructors"
-            elif group == "Field": group = "Fields"
-            elif group == "Property": group = "Properties"
-            elif group == "Method": group = "Methods"
-            elif group == "Event": group = "Events"
+            if group == "Constructor":
+                group = "Constructors"
+            elif group == "Field":
+                group = "Fields"
+            elif group == "Property":
+                group = "Properties"
+            elif group == "Method":
+                group = "Methods"
+            elif group == "Event":
+                group = "Events"
             
             if group != current_group:
                 parts += [f"## {group}", ""]
@@ -427,8 +433,10 @@ def render_type_page(
             rdesc = rewrite_xrefs(as_text(ret.get("description")), uid_targets)
             if rtype or rdesc:
                 label = "Returns"
-                if m.kind.lower() == "property": label = "Property Value"
-                elif m.kind.lower() == "field": label = "Field Value"
+                if m.kind.lower() == "property":
+                    label = "Property Value"
+                elif m.kind.lower() == "field":
+                    label = "Field Value"
                 
                 parts.append(f"#### {label}")
                 parts.append("")
