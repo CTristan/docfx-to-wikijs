@@ -2,6 +2,7 @@
 # For more information, see: https://docs.astral.sh/ruff/configuration/
 
 target-version = "py312"
+exclude = ["**/__init__.py"]
 
 [lint]
 select = ["B", "D", "E", "F", "Q", "T"]

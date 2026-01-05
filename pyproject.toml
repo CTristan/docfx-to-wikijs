@@ -19,3 +19,7 @@ omit = [
     "dev.py",
     "main.py",
 ]
+
+[tool.mypy]
+mypy_path = "src"
+explicit_package_bases = true
