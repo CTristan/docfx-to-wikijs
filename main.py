@@ -2,10 +2,11 @@
 
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 
-def run_command(cmd_list, cwd=None) -> None:
+def run_command(cmd_list: Sequence[str | Path], cwd: Path | str | None = None) -> None:
     """Run a command and exit if it fails."""
     cmd_str = " ".join(str(x) for x in cmd_list)
     print(f"Running: {cmd_str}")

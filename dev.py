@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 
-def run_command(command, step_name) -> None:
+def run_command(command: list[str], step_name: str) -> None:
     """Run a shell command as a step in the development process."""
     print(f"\n--- Running Step: {step_name} ---")
     print(f"$ {' '.join(command)}")

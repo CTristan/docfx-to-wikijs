@@ -1,11 +1,29 @@
 """Tests for the docfx_yml_to_wikijs module."""
 
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from docfx_yml_to_wikijs import (
+    ItemInfo,
+    LinkTarget,
     as_text,
+    build_link_targets,
     dot_safe,
     header_slug,
+    is_member_kind,
+    is_namespace_kind,
+    is_type_kind,
+    iter_main_items,
+    load_managed_reference,
+    main,
+    md_codeblock,
+    md_table,
+    namespace_of,
+    page_path_for_fullname,
+    render_namespace_page,
+    render_type_page,
+    rewrite_xrefs,
     strip_yaml_mime_header,
 )
 
@@ -47,16 +65,12 @@ def test_as_text() -> None:
 
 def test_md_codeblock() -> None:
     """Test code block generation."""
-    from docfx_yml_to_wikijs import md_codeblock
-
     assert md_codeblock("csharp", "var x = 1;") == "```csharp\nvar x = 1;\n```"
     assert md_codeblock("python", "print('hi')\n") == "```python\nprint('hi')\n```"
 
 
 def test_md_table() -> None:
     """Test Markdown table generation."""
-    from docfx_yml_to_wikijs import md_table
-
     assert md_table([], []) == ""
 
     headers = ["Name", "Value"]
@@ -67,8 +81,6 @@ def test_md_table() -> None:
 
 def test_kind_predicates() -> None:
     """Test item kind predicate functions."""
-    from docfx_yml_to_wikijs import is_member_kind, is_namespace_kind, is_type_kind
-
     assert is_type_kind("Class")
     assert is_type_kind("struct")
     assert is_type_kind("Enum")
@@ -86,8 +98,6 @@ def test_kind_predicates() -> None:
 
 def test_namespace_of() -> None:
     """Test namespace extraction logic."""
-    from docfx_yml_to_wikijs import ItemInfo, namespace_of
-
     # Mock ItemInfo since we just need simple attribute access
     # We can use a simple class or the actual dataclass if we import it
 
@@ -136,8 +146,6 @@ def test_namespace_of() -> None:
 
 def test_page_path_for_fullname() -> None:
     """Test wiki page path generation."""
-    from docfx_yml_to_wikijs import page_path_for_fullname
-
     assert (
         page_path_for_fullname("/api", "My.Namespace.Class")
         == "/api/My-Namespace-Class"
@@ -147,8 +155,6 @@ def test_page_path_for_fullname() -> None:
 
 def test_build_link_targets() -> None:
     """Test building link targets from items and references."""
-    from docfx_yml_to_wikijs import ItemInfo, build_link_targets
-
     # Mock data
     uid_to_item = {
         "My.Class": ItemInfo(
@@ -200,8 +206,6 @@ def test_build_link_targets() -> None:
 
 def test_rewrite_xrefs() -> None:
     """Test rewriting XRef tags to Markdown links."""
-    from docfx_yml_to_wikijs import LinkTarget, rewrite_xrefs
-
     targets = {
         "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
         "System.String": LinkTarget(
@@ -224,8 +228,6 @@ def test_rewrite_xrefs() -> None:
 
 def test_load_managed_reference(tmp_path: Path) -> None:
     """Test loading a ManagedReference YAML file."""
-    from docfx_yml_to_wikijs import load_managed_reference
-
     f = tmp_path / "test.yml"
     f.write_text(
         "### YamlMime:ManagedReference\nitems:\n  - uid: Test", encoding="utf-8"
@@ -237,8 +239,6 @@ def test_load_managed_reference(tmp_path: Path) -> None:
 
 def test_iter_main_items() -> None:
     """Test iterating over main items in a document."""
-    from docfx_yml_to_wikijs import iter_main_items
-
     doc = {
         "items": [
             {"uid": "A", "name": "Item A"},
@@ -248,15 +248,14 @@ def test_iter_main_items() -> None:
     }
 
     items = list(iter_main_items(doc))
-    assert len(items) == 2
+    num_items = 2
+    assert len(items) == num_items
     assert items[0]["uid"] == "A"
     assert items[1]["uid"] == "B"
 
 
 def test_render_namespace_page() -> None:
     """Test rendering a namespace page."""
-    from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_namespace_page
-
     # Setup
     uid_targets = {
         "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
@@ -295,8 +294,6 @@ def test_render_namespace_page() -> None:
 
 def test_render_type_page() -> None:
     """Test rendering a type page."""
-    from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_type_page
-
     # Setup
     uid_targets = {
         "My": LinkTarget(title="My", page_path="/api/My"),
@@ -358,7 +355,6 @@ def test_render_type_page() -> None:
         class_item,
         uid_to_item=uid_to_item,
         uid_targets=uid_targets,
-        api_root="/api",
         include_member_details=True,
     )
 
@@ -389,11 +385,6 @@ def test_render_type_page() -> None:
 
 def test_main_integration(tmp_path: Path) -> None:
     """Test the main function with mocked arguments."""
-    import sys
-    from unittest.mock import patch
-
-    from docfx_yml_to_wikijs import main
-
     # Create source dir with one yml file
     src = tmp_path / "src"
     src.mkdir()
