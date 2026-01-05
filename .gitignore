@@ -16,6 +16,10 @@ wheels/
 .venv/
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
+.coverage
+coverage.json
+htmlcov/
 
 # Logs and temps
 *.log
