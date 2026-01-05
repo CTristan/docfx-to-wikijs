@@ -387,7 +387,7 @@ def test_render_type_page() -> None:
     assert "Boom" in md
 
 
-def test_main_integration(tmp_path) -> None:
+def test_main_integration(tmp_path: Path) -> None:
     """Test the main function with mocked arguments."""
     import sys
     from unittest.mock import patch
