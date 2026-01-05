@@ -252,7 +252,7 @@ def render_namespace_page(
     for k in kinds:
         matches = [t for t in types_in_ns if t.kind.lower() == k.lower()]
         if matches:
-            plural = k + ("es" if k.endswith("s") else "s")
+            plural = k + ("es" if any(k.lower().endswith(suffix) for suffix in ("s", "ss", "x", "z", "ch", "sh")) else "s")
             parts += [f"## {plural}", ""]
             for t in sorted(matches, key=lambda x: x.name.lower()):
                 page = page_path_for_fullname(api_root, t.full_name)
