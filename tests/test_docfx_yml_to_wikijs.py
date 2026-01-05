@@ -88,18 +88,6 @@ def test_namespace_of() -> None:
     # Mock ItemInfo since we just need simple attribute access
     # We can use a simple class or the actual dataclass if we import it
 
-    ItemInfo(
-        uid="u",
-        kind="k",
-        name="n",
-        full_name="n",
-        parent=None,
-        namespace=None,
-        summary="",
-        file=Path(),
-        raw={},
-    )
-
     # Case 1: Explicit namespace
     item1 = ItemInfo(
         uid="u",
