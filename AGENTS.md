@@ -9,7 +9,7 @@ This project is a documentation site generator for the Unity game *Lobotomy Corp
 - **`scripts/`**: Contains utility scripts, primarily `docfx_yml_to_wikijs.py` for converting DocFX YAML to Wiki.js Markdown.
 - **`_site/`**: The output directory containing the generated static HTML website (standard DocFX output).
 - **`wikijs_out/`**: (Generated) The output directory containing the Markdown files ready for Wiki.js.
-- **`docfx.json`**: The main configuration file for DocFX, defining input sources (`src/`), output destinations (`api/`, `_site`), and templates.
+- **`docfx.json`**: The main configuration file for DocFX, defining input sources (`assemblies/`), output destinations (`api/`, `_site`), and templates.
 - **`main.py`**: The orchestration script that runs `docfx metadata` followed by the Wiki.js conversion script.
 - **`pyproject.toml`**: Python project configuration using `uv` for dependency management, including tools like `mypy` and `ruff`.
 
