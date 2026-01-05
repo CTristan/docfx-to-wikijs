@@ -382,17 +382,15 @@ def render_type_page(
 
         for m in members_sorted:
             group = m.kind.capitalize()
-            if group == "Constructor":
-                group = "Constructors"
-            elif group == "Field":
-                group = "Fields"
-            elif group == "Property":
-                group = "Properties"
-            elif group == "Method":
-                group = "Methods"
-            elif group == "Event":
-                group = "Events"
-            
+            group_plural_map = {
+                "Constructor": "Constructors",
+                "Field": "Fields",
+                "Property": "Properties",
+                "Method": "Methods",
+                "Event": "Events",
+                "Operator": "Operators",
+            }
+            group = group_plural_map.get(group, group)
             if group != current_group:
                 parts += [f"## {group}", ""]
                 current_group = group
