@@ -43,8 +43,8 @@ def as_text(v: Any) -> str:
 
 
 def dot_safe(name: str) -> str:
-    """Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js compatibility.
-    Also normalize nested types and generics markers.
+    """Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js
+    compatibility. Also normalize nested types and generics markers.
     """
     name = name.replace("+", "-")  # nested types Outer+Inner -> Outer-Inner
     name = name.replace("`", "")  # generics Foo`1 -> Foo1-ish
@@ -535,7 +535,10 @@ def render_type_page(
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish layout).",
+        description=(
+            "Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish "
+            "layout)."
+        ),
     )
     ap.add_argument(
         "yml_dir",
@@ -646,7 +649,10 @@ def main() -> int:
         home = [
             "# Home",
             "",
-            "This wiki was initially generated from DocFX metadata and is now editable.",
+            (
+                "This wiki was initially generated from DocFX metadata and is now "
+                "editable."
+            ),
             "",
             f"- Browse the API under `{args.api_root}`",
             "",
