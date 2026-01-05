@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml  # type: ignore
+import yaml  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -40,7 +40,7 @@ def strip_yaml_mime_header(text: str) -> str:
     return text
 
 
-def as_text(v: Any) -> str:
+def as_text(v: object) -> str:
     """Convert a value to a string, handling lists and None."""
     if v is None:
         return ""

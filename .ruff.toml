@@ -5,7 +5,7 @@ target-version = "py312"
 exclude = ["**/__init__.py"]
 
 [lint]
-select = ["B", "D", "E", "F", "Q", "T"]
+select = ["ALL"]
 ignore = [
     "COM812", # Causes conflicts with formatter
     "D203", # Incompatible formatting
@@ -14,4 +14,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
+"dev.py" = ["S603"] # Subprocess used to run dev tools (ruff, mypy, pytest)
+"main.py" = ["S603"] # Subprocess used to invoke 'dotnet docfx' and conversion scripts
+
 "tests/*" = ["S101"] # Use of assert is standard in tests
