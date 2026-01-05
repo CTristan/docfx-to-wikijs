@@ -8,37 +8,28 @@
           "files": ["Assembly-CSharp.dll"]
         }
       ],
-      "dest": "api"
+      "output": "api",
+      "globalNamespaceId": "Global"
     }
   ],
   "build": {
     "content": [
       {
-        "files": [
-          "**/*.{md,yml}"
-        ],
-        "exclude": [
-          "_site/**"
-        ]
+        "files": ["**/*.{md,yml}"],
+        "exclude": ["_site/**"]
       }
     ],
     "resource": [
       {
-        "files": [
-          "images/**"
-        ]
+        "files": ["images/**"]
       }
     ],
     "output": "_site",
-    "template": [
-      "default",
-      "modern"
-    ],
+    "template": ["default", "modern"],
     "globalMetadata": {
       "_appName": "",
       "_appTitle": "",
       "_enableSearch": true,
-      "pdf": true
     }
   }
 }
