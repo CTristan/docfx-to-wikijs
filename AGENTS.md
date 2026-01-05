@@ -19,6 +19,7 @@ This project is a documentation site generator for the Unity game *Lobotomy Corp
 - **DocFX**: Required to generate metadata (`dotnet docfx`).
 - **Python 3.12+**: Required for the Python tooling.
 - **uv**: Recommended for managing Python dependencies.
+- **ripgrep**: Available via the `rg` command for fast searching.
 
 ### Key Commands
 
