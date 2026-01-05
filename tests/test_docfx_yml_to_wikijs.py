@@ -22,6 +22,7 @@ def test_strip_yaml_mime_header() -> None:
     content_no_header = "items:\n  - uid: Foo"
     assert strip_yaml_mime_header(content_no_header) == content_no_header
 
+
 def test_dot_safe() -> None:
     assert dot_safe("System.String") == "System-String"
     assert dot_safe("List`1") == "List1"
@@ -29,11 +30,13 @@ def test_dot_safe() -> None:
     assert dot_safe("Outer+Inner") == "Outer-Inner"
     assert dot_safe("..Invalid..") == "Invalid"
 
+
 def test_header_slug() -> None:
     assert header_slug("My Header") == "my-header"
     assert header_slug("Header with 123") == "header-with-123"
     assert header_slug("Complex!@#Header") == "complex-header"
     assert header_slug("  Trim Me  ") == "trim-me"
+
 
 def test_as_text() -> None:
     assert as_text(None) == ""
@@ -41,24 +44,24 @@ def test_as_text() -> None:
     assert as_text([" A ", " B "]) == "A\nB"
     assert as_text(123) == "123"
 
+
 def test_md_codeblock() -> None:
     from docfx_yml_to_wikijs import md_codeblock
+
     assert md_codeblock("csharp", "var x = 1;") == "```csharp\nvar x = 1;\n```"
     assert md_codeblock("python", "print('hi')\n") == "```python\nprint('hi')\n```"
 
+
 def test_md_table() -> None:
     from docfx_yml_to_wikijs import md_table
+
     assert md_table([], []) == ""
 
     headers = ["Name", "Value"]
     rows = [["A", "1"], ["B", "2"]]
-    expected = (
-        "| Name | Value |\n"
-        "| --- | --- |\n"
-        "| A | 1 |\n"
-        "| B | 2 |"
-    )
+    expected = "| Name | Value |\n| --- | --- |\n| A | 1 |\n| B | 2 |"
     assert md_table(headers, rows) == expected
+
 
 def test_kind_predicates() -> None:
     from docfx_yml_to_wikijs import is_member_kind, is_namespace_kind, is_type_kind
@@ -77,6 +80,7 @@ def test_kind_predicates() -> None:
     assert is_member_kind("Constructor")
     assert not is_member_kind("Class")
 
+
 def test_namespace_of() -> None:
     from docfx_yml_to_wikijs import ItemInfo, namespace_of
 
@@ -84,36 +88,69 @@ def test_namespace_of() -> None:
     # We can use a simple class or the actual dataclass if we import it
 
     ItemInfo(
-        uid="u", kind="k", name="n", full_name="n",
-        parent=None, namespace=None, summary="", file=Path(), raw={},
+        uid="u",
+        kind="k",
+        name="n",
+        full_name="n",
+        parent=None,
+        namespace=None,
+        summary="",
+        file=Path(),
+        raw={},
     )
 
     # Case 1: Explicit namespace
     item1 = ItemInfo(
-        uid="u", kind="k", name="n", full_name="n",
-        parent=None, namespace="My.Ns", summary="", file=Path(), raw={},
+        uid="u",
+        kind="k",
+        name="n",
+        full_name="n",
+        parent=None,
+        namespace="My.Ns",
+        summary="",
+        file=Path(),
+        raw={},
     )
     assert namespace_of(item1) == "My.Ns"
 
     # Case 2: Derived from full_name
     item2 = ItemInfo(
-        uid="u", kind="k", name="n", full_name="My.Ns.Type",
-        parent=None, namespace=None, summary="", file=Path(), raw={},
+        uid="u",
+        kind="k",
+        name="n",
+        full_name="My.Ns.Type",
+        parent=None,
+        namespace=None,
+        summary="",
+        file=Path(),
+        raw={},
     )
     assert namespace_of(item2) == "My.Ns"
 
     # Case 3: No namespace
     item3 = ItemInfo(
-        uid="u", kind="k", name="n", full_name="Type",
-        parent=None, namespace=None, summary="", file=Path(), raw={},
+        uid="u",
+        kind="k",
+        name="n",
+        full_name="Type",
+        parent=None,
+        namespace=None,
+        summary="",
+        file=Path(),
+        raw={},
     )
     assert namespace_of(item3) == ""
+
 
 def test_page_path_for_fullname() -> None:
     from docfx_yml_to_wikijs import page_path_for_fullname
 
-    assert page_path_for_fullname("/api", "My.Namespace.Class") == "/api/My-Namespace-Class"
+    assert (
+        page_path_for_fullname("/api", "My.Namespace.Class")
+        == "/api/My-Namespace-Class"
+    )
     assert page_path_for_fullname("/docs", "Simple") == "/docs/Simple"
+
 
 def test_build_link_targets() -> None:
     from docfx_yml_to_wikijs import ItemInfo, build_link_targets
@@ -121,17 +158,35 @@ def test_build_link_targets() -> None:
     # Mock data
     uid_to_item = {
         "My.Class": ItemInfo(
-            uid="My.Class", kind="Class", name="Class", full_name="My.Class",
-            parent="My", namespace="My", summary="", file=Path(), raw={},
+            uid="My.Class",
+            kind="Class",
+            name="Class",
+            full_name="My.Class",
+            parent="My",
+            namespace="My",
+            summary="",
+            file=Path(),
+            raw={},
         ),
         "My.Class.Method": ItemInfo(
-            uid="My.Class.Method", kind="Method", name="Method", full_name="My.Class.Method",
-            parent="My.Class", namespace="My", summary="", file=Path(), raw={},
+            uid="My.Class.Method",
+            kind="Method",
+            name="Method",
+            full_name="My.Class.Method",
+            parent="My.Class",
+            namespace="My",
+            summary="",
+            file=Path(),
+            raw={},
         ),
     }
 
     uid_to_ref = {
-        "System.String": {"uid": "System.String", "name": "String", "href": "https://msdn.com/String"},
+        "System.String": {
+            "uid": "System.String",
+            "name": "String",
+            "href": "https://msdn.com/String",
+        },
     }
 
     targets = build_link_targets(uid_to_item, uid_to_ref, "/api")
@@ -148,12 +203,15 @@ def test_build_link_targets() -> None:
     assert "System.String" in targets
     assert targets["System.String"].page_path == "https://msdn.com/String"
 
+
 def test_rewrite_xrefs() -> None:
     from docfx_yml_to_wikijs import LinkTarget, rewrite_xrefs
 
     targets = {
         "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
-        "System.String": LinkTarget(title="String", page_path="https://msdn.com/String"),
+        "System.String": LinkTarget(
+            title="String", page_path="https://msdn.com/String"
+        ),
     }
 
     # Test <xref:UID> format
@@ -168,14 +226,18 @@ def test_rewrite_xrefs() -> None:
     text3 = "Unknown <xref:Unknown.Uid>"
     assert rewrite_xrefs(text3, targets) == "Unknown `Unknown.Uid`"
 
+
 def test_load_managed_reference(tmp_path) -> None:
     from docfx_yml_to_wikijs import load_managed_reference
 
     f = tmp_path / "test.yml"
-    f.write_text("### YamlMime:ManagedReference\nitems:\n  - uid: Test", encoding="utf-8")
+    f.write_text(
+        "### YamlMime:ManagedReference\nitems:\n  - uid: Test", encoding="utf-8"
+    )
 
     doc = load_managed_reference(f)
     assert doc["items"][0]["uid"] == "Test"
+
 
 def test_iter_main_items() -> None:
     from docfx_yml_to_wikijs import iter_main_items
@@ -193,6 +255,7 @@ def test_iter_main_items() -> None:
     assert items[0]["uid"] == "A"
     assert items[1]["uid"] == "B"
 
+
 def test_render_namespace_page() -> None:
     from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_namespace_page
 
@@ -203,8 +266,15 @@ def test_render_namespace_page() -> None:
 
     items = [
         ItemInfo(
-            uid="My.Class", kind="Class", name="Class", full_name="My.Class",
-            parent="My", namespace="My", summary="A summary.", file=Path(), raw={},
+            uid="My.Class",
+            kind="Class",
+            name="Class",
+            full_name="My.Class",
+            parent="My",
+            namespace="My",
+            summary="A summary.",
+            file=Path(),
+            raw={},
         ),
     ]
 
@@ -224,6 +294,7 @@ def test_render_namespace_page() -> None:
     assert "[Class](/api/My-Class)" in md
     assert "A summary." in md
 
+
 def test_render_type_page() -> None:
     from docfx_yml_to_wikijs import ItemInfo, LinkTarget, render_type_page
 
@@ -239,8 +310,14 @@ def test_render_type_page() -> None:
 
     # Class Item
     class_item = ItemInfo(
-        uid="My.Class", kind="Class", name="Class", full_name="My.Class",
-        parent="My", namespace="My", summary="Class summary.", file=Path(),
+        uid="My.Class",
+        kind="Class",
+        name="Class",
+        full_name="My.Class",
+        parent="My",
+        namespace="My",
+        summary="Class summary.",
+        file=Path(),
         raw={
             "assemblies": ["MyAssembly"],
             "inheritance": ["System.Object"],
@@ -253,8 +330,14 @@ def test_render_type_page() -> None:
 
     # Method Item (child)
     method_item = ItemInfo(
-        uid="My.Class.Method", kind="Method", name="Method", full_name="My.Class.Method",
-        parent="My.Class", namespace="My", summary="Method summary.", file=Path(),
+        uid="My.Class.Method",
+        kind="Method",
+        name="Method",
+        full_name="My.Class.Method",
+        parent="My.Class",
+        namespace="My",
+        summary="Method summary.",
+        file=Path(),
         raw={
             "syntax": {
                 "content": "public void Method(string s)",
@@ -304,6 +387,7 @@ def test_render_type_page() -> None:
     assert "#### Exceptions" in md
     assert "Boom" in md
 
+
 def test_main_integration(tmp_path) -> None:
     import sys
     from unittest.mock import patch
@@ -313,14 +397,17 @@ def test_main_integration(tmp_path) -> None:
     # Create source dir with one yml file
     src = tmp_path / "src"
     src.mkdir()
-    (src / "test.yml").write_text("""### YamlMime:ManagedReference
+    (src / "test.yml").write_text(
+        """### YamlMime:ManagedReference
 items:
   - uid: My.Class
     type: Class
     name: Class
     fullName: My.Class
     summary: Summary
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
     out = tmp_path / "out"
 
@@ -340,7 +427,7 @@ items:
 
     # Verify output
     assert (out / "api/My-Class.md").exists()
-    assert (out / "api/My.md").exists() # Namespace page
+    assert (out / "api/My.md").exists()  # Namespace page
     assert (out / "home.md").exists()
 
     content = (out / "api/My-Class.md").read_text(encoding="utf-8")

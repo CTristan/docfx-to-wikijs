@@ -563,7 +563,9 @@ def main() -> int:
         help="Inline member sections (constructors/methods/etc.) on type pages",
     )
     ap.add_argument(
-        "--home-page", action="store_true", help="Generate a simple Home page (home.md)",
+        "--home-page",
+        action="store_true",
+        help="Generate a simple Home page (home.md)",
     )
     args = ap.parse_args()
 
