@@ -604,6 +604,7 @@ def render_type_page(
     uid_to_item: dict[str, ItemInfo],
     uid_targets: dict[str, LinkTarget],
     api_root: str,
+    *,
     include_member_details: bool = True,
 ) -> str:
     """Render a type page (class, struct, etc.) in Markdown."""
