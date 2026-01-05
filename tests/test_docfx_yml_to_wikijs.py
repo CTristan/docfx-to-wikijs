@@ -248,7 +248,8 @@ def test_iter_main_items() -> None:
     }
 
     items = list(iter_main_items(doc))
-    assert len(items) == 2
+    num_items = 2
+    assert len(items) == num_items
     assert items[0]["uid"] == "A"
     assert items[1]["uid"] == "B"
 
