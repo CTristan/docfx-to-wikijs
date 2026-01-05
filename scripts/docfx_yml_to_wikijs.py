@@ -4,9 +4,12 @@ import argparse
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import yaml  # type: ignore
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # -----------------------------
 # Utilities
@@ -15,7 +18,7 @@ import yaml  # type: ignore
 YAML_MIME_PREFIX = "### YamlMime:"
 XREF_TAG_RE = re.compile(r"<xref:([^?>#>]+)(?:\?[^>#>]*)?(?:#[^>]*)?>")
 XREF_MD_LINK_RE = re.compile(
-    r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)"
+    r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)",
 )  # (xref:UID?...)
 
 # Conservative: keep letters, digits, underscore, dash. Dots are replaced with hyphens.
@@ -40,8 +43,7 @@ def as_text(v: Any) -> str:
 
 
 def dot_safe(name: str) -> str:
-    """
-    Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js compatibility.
+    """Make a stable filename-ish token. Replaces dots with hyphens for Wiki.js compatibility.
     Also normalize nested types and generics markers.
     """
     name = name.replace("+", "-")  # nested types Outer+Inner -> Outer-Inner
@@ -53,9 +55,7 @@ def dot_safe(name: str) -> str:
 
 
 def header_slug(s: str) -> str:
-    """
-    GitHub-ish anchor slug: lower, hyphenate non-alnum.
-    """
+    """GitHub-ish anchor slug: lower, hyphenate non-alnum."""
     s = s.strip().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     s = re.sub(r"-{2,}", "-", s).strip("-")
@@ -66,7 +66,7 @@ def md_codeblock(lang: str, code: str) -> str:
     return f"```{lang}\n{code.rstrip()}\n```"
 
 
-def md_table(headers: List[str], rows: List[List[str]]) -> str:
+def md_table(headers: list[str], rows: list[list[str]]) -> str:
     if not rows:
         return ""
     out = [
@@ -89,11 +89,11 @@ class ItemInfo:
     kind: str  # Namespace/Class/Method/Property/etc.
     name: str
     full_name: str
-    parent: Optional[str]
-    namespace: Optional[str]
+    parent: str | None
+    namespace: str | None
     summary: str
     file: Path
-    raw: Dict[str, Any]  # original parsed item
+    raw: dict[str, Any]  # original parsed item
 
 
 @dataclass(frozen=True)
@@ -107,7 +107,7 @@ class LinkTarget:
 # -----------------------------
 
 
-def load_managed_reference(path: Path) -> Dict[str, Any]:
+def load_managed_reference(path: Path) -> dict[str, Any]:
     raw = strip_yaml_mime_header(path.read_text(encoding="utf-8"))
     # Fix unquoted equals sign in VB names which confuses PyYAML
     # Matches: "  name.vb: =" -> "  name.vb: '='"
@@ -116,7 +116,7 @@ def load_managed_reference(path: Path) -> Dict[str, Any]:
     return doc or {}
 
 
-def iter_main_items(doc: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+def iter_main_items(doc: dict[str, Any]) -> Iterable[dict[str, Any]]:
     items = doc.get("items") or []
     for it in items:
         if isinstance(it, dict) and it.get("uid"):
@@ -124,10 +124,10 @@ def iter_main_items(doc: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
 
 
 def build_index(
-    yml_files: List[Path],
-) -> Tuple[Dict[str, ItemInfo], Dict[str, Dict[str, Any]]]:
-    uid_to_item: Dict[str, ItemInfo] = {}
-    uid_to_ref: Dict[str, Dict[str, Any]] = {}
+    yml_files: list[Path],
+) -> tuple[dict[str, ItemInfo], dict[str, dict[str, Any]]]:
+    uid_to_item: dict[str, ItemInfo] = {}
+    uid_to_ref: dict[str, dict[str, Any]] = {}
     for f in yml_files:
         doc = load_managed_reference(f)
         for it in iter_main_items(doc):
@@ -199,11 +199,11 @@ def output_file_for_page(out_root: Path, page_path: str) -> Path:
 
 
 def build_link_targets(
-    uid_to_item: Dict[str, ItemInfo],
-    uid_to_ref: Dict[str, Dict[str, Any]],
+    uid_to_item: dict[str, ItemInfo],
+    uid_to_ref: dict[str, dict[str, Any]],
     api_root: str,
-) -> Dict[str, LinkTarget]:
-    targets: Dict[str, LinkTarget] = {}
+) -> dict[str, LinkTarget]:
+    targets: dict[str, LinkTarget] = {}
 
     # 1. Internal types and namespaces (pages)
     for uid, item in uid_to_item.items():
@@ -236,7 +236,7 @@ def build_link_targets(
     return targets
 
 
-def rewrite_xrefs(text: str, uid_targets: Dict[str, LinkTarget]) -> str:
+def rewrite_xrefs(text: str, uid_targets: dict[str, LinkTarget]) -> str:
     if not text:
         return ""
 
@@ -258,8 +258,7 @@ def rewrite_xrefs(text: str, uid_targets: Dict[str, LinkTarget]) -> str:
             return "(#)"
         return f"({t.page_path})"
 
-    text = XREF_MD_LINK_RE.sub(repl_link, text)
-    return text
+    return XREF_MD_LINK_RE.sub(repl_link, text)
 
 
 # -----------------------------
@@ -269,12 +268,12 @@ def rewrite_xrefs(text: str, uid_targets: Dict[str, LinkTarget]) -> str:
 
 def render_namespace_page(
     ns_fullname: str,
-    types_in_ns: List[ItemInfo],
-    child_namespaces: List[str],
-    uid_targets: Dict[str, LinkTarget],
+    types_in_ns: list[ItemInfo],
+    child_namespaces: list[str],
+    uid_targets: dict[str, LinkTarget],
     api_root: str,
 ) -> str:
-    parts: List[str] = [f"# Namespace {ns_fullname}", ""]
+    parts: list[str] = [f"# Namespace {ns_fullname}", ""]
 
     if child_namespaces:
         parts += ["## Namespaces", ""]
@@ -318,8 +317,8 @@ def render_namespace_page(
 
 def render_type_page(
     item: ItemInfo,
-    uid_to_item: Dict[str, ItemInfo],
-    uid_targets: Dict[str, LinkTarget],
+    uid_to_item: dict[str, ItemInfo],
+    uid_targets: dict[str, LinkTarget],
     api_root: str,
     include_member_details: bool = True,
 ) -> str:
@@ -327,7 +326,7 @@ def render_type_page(
     ns = namespace_of(item)
 
     kind_label = item.kind.capitalize()
-    parts: List[str] = [f"# {kind_label} {item.name}", ""]
+    parts: list[str] = [f"# {kind_label} {item.name}", ""]
 
     # Metadata block
     if ns:
@@ -357,7 +356,7 @@ def render_type_page(
             atype = a.get("type")
             at = uid_targets.get(atype)
             parts.append(
-                f"[`[{at.title if at else atype}]`]({at.page_path if at else '#'})"
+                f"[`[{at.title if at else atype}]`]({at.page_path if at else '#'})",
             )
         parts.append("")
 
@@ -419,7 +418,7 @@ def render_type_page(
 
     if members:
 
-        def member_key(m: ItemInfo) -> Tuple[str, str]:
+        def member_key(m: ItemInfo) -> tuple[str, str]:
             order = {
                 "constructor": "0",
                 "field": "1",
@@ -432,7 +431,7 @@ def render_type_page(
             return (order.get(k, "9"), m.name.lower())
 
         members_sorted = sorted(members, key=member_key)
-        current_group: Optional[str] = None
+        current_group: str | None = None
 
         for m in members_sorted:
             group = m.kind.capitalize()
@@ -470,7 +469,7 @@ def render_type_page(
             if params:
                 parts.append("#### Parameters")
                 parts.append("")
-                rows: List[List[str]] = []
+                rows: list[list[str]] = []
                 for p in params:
                     pname = str(p.get("id") or p.get("name") or "")
                     ptype = rewrite_xrefs(as_text(p.get("type")), uid_targets)
@@ -536,7 +535,7 @@ def render_type_page(
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish layout)."
+        description="Convert DocFX ManagedReference YAML to Wiki.js Markdown (DocFX-ish layout).",
     )
     ap.add_argument(
         "yml_dir",
@@ -564,13 +563,14 @@ def main() -> int:
         help="Inline member sections (constructors/methods/etc.) on type pages",
     )
     ap.add_argument(
-        "--home-page", action="store_true", help="Generate a simple Home page (home.md)"
+        "--home-page", action="store_true", help="Generate a simple Home page (home.md)",
     )
     args = ap.parse_args()
 
     yml_files = sorted(args.yml_dir.rglob("*.yml"))
     if not yml_files:
-        raise SystemExit(f"No .yml files found under: {args.yml_dir}")
+        msg = f"No .yml files found under: {args.yml_dir}"
+        raise SystemExit(msg)
 
     uid_to_item, uid_to_ref = build_index(yml_files)
     uid_targets = build_link_targets(uid_to_item, uid_to_ref, args.api_root)
@@ -579,7 +579,7 @@ def main() -> int:
     out_root.mkdir(parents=True, exist_ok=True)
 
     # Collect types by namespace for optional namespace pages
-    ns_to_types: Dict[str, List[ItemInfo]] = {}
+    ns_to_types: dict[str, list[ItemInfo]] = {}
     for it in uid_to_item.values():
         if is_type_kind(it.kind):
             ns = namespace_of(it)
@@ -587,7 +587,7 @@ def main() -> int:
 
     # Build namespace graph for child namespace listing
     # ns "foo.bar" has parent "foo"
-    ns_children: Dict[str, set[str]] = {}
+    ns_children: dict[str, set[str]] = {}
     all_namespaces = set(ns_to_types.keys())
     for ns in list(all_namespaces):
         if not ns:
