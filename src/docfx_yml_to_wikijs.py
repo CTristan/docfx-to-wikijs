@@ -603,7 +603,6 @@ def render_type_page(
     item: ItemInfo,
     uid_to_item: dict[str, ItemInfo],
     uid_targets: dict[str, LinkTarget],
-    api_root: str,
     *,
     include_member_details: bool = True,
 ) -> str:
@@ -687,7 +686,6 @@ def _write_type_pages(
             it,
             uid_to_item=uid_to_item,
             uid_targets=uid_targets,
-            api_root=args.api_root,
             include_member_details=args.include_member_details,
         )
         out_file = output_file_for_page(out_root, page_path)

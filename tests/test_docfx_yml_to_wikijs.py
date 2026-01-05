@@ -355,7 +355,6 @@ def test_render_type_page() -> None:
         class_item,
         uid_to_item=uid_to_item,
         uid_targets=uid_targets,
-        api_root="/api",
         include_member_details=True,
     )
 
