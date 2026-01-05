@@ -41,6 +41,7 @@ def dot_safe(name: str) -> str:
     """
     name = name.replace("+", "-")      # nested types Outer+Inner -> Outer-Inner
     name = name.replace("`", "")       # generics Foo`1 -> Foo1-ish
+    name = name.replace(".", "-")      # dots -> hyphens for Wiki.js compatibility
     name = DOT_SAFE_RE.sub("-", name).strip("-")
     # Avoid pathological emptiness
     return name or "Unknown"
