@@ -13,6 +13,7 @@ def run_command(cmd_list, cwd=None) -> None:
         print(f"Error executing command: {cmd_str}")
         sys.exit(e.returncode)
 
+
 def main() -> None:
     root_dir = Path(__file__).parent
 
@@ -38,12 +39,14 @@ def main() -> None:
         "--include-namespace-pages",
         "--include-member-details",
         "--home-page",
-        "--api-root", "/api",
+        "--api-root",
+        "/api",
     ]
 
     run_command(cmd)
 
     print(f"\nSUCCESS: Documentation generated in {out_dir}")
+
 
 if __name__ == "__main__":
     main()

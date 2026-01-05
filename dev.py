@@ -11,6 +11,7 @@ def run_command(command, step_name) -> None:
         print(f"\n❌ Failed: {step_name}")
         sys.exit(1)
 
+
 def main() -> None:
     # 1. Run Ruff
     run_command(
@@ -32,6 +33,6 @@ def main() -> None:
 
     print("\n✅ All development checks and main script passed successfully.")
 
+
 if __name__ == "__main__":
     main()
-
