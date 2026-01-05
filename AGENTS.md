@@ -30,15 +30,22 @@ uv run python main.py
 ```
 
 #### Development Cycle (Recommended)
-To run the full development pipeline (Formatting -> Linting -> Type Checking -> Unit Tests -> Build):
+To run the full development pipeline (Linting -> Type Checking -> Build):
 ```bash
 uv run python dev.py
 ```
 
-To run only the CI checks (Formatting -> Linting -> Type Checking -> Unit Tests) without executing the main build script:
+To run only the verification steps (Linting -> Type Checking -> Tests) without the build:
 ```bash
 uv run python dev.py --ci
 ```
+
+#### Continuous Integration
+The project uses GitHub Actions for CI. The workflow is defined in `.github/workflows/ci-gate.yml` and performs the following checks on Pull Requests:
+1.  **Setup**: Installs Python 3.12 and `uv`.
+2.  **Dependencies**: Installs dependencies using `uv sync --frozen`.
+3.  **Verification**: Runs `uv run python dev.py --ci`.
+4.  **Artifacts**: Uploads coverage reports.
 
 #### Documentation Build (Standard DocFX)
 To only build the standard DocFX static site:
