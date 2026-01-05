@@ -86,8 +86,7 @@ def md_table(headers: list[str], rows: list[list[str]]) -> str:
         "| " + " | ".join(headers) + " |",
         "| " + " | ".join(["---"] * len(headers)) + " |",
     ]
-    for r in rows:
-        out.append("| " + " | ".join(r) + " |")
+    out.extend("| " + " | ".join(r) + " |" for r in rows)
     return "\n".join(out)
 
 
