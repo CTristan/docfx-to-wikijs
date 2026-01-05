@@ -222,7 +222,7 @@ def test_rewrite_xrefs() -> None:
     assert rewrite_xrefs(text3, targets) == "Unknown `Unknown.Uid`"
 
 
-def test_load_managed_reference(tmp_path) -> None:
+def test_load_managed_reference(tmp_path: Path) -> None:
     """Test loading a ManagedReference YAML file."""
     from docfx_yml_to_wikijs import load_managed_reference
 
