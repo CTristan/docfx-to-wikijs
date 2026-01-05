@@ -28,6 +28,12 @@ To regenerate the DocFX metadata and convert it to Wiki.js format in one go:
 uv run python main.py
 ```
 
+#### Development Cycle (Recommended)
+To run the full development pipeline (Linting -> Type Checking -> Build):
+```bash
+uv run python dev.py
+```
+
 #### Documentation Build (Standard DocFX)
 To only build the standard DocFX static site:
 ```bash
@@ -49,9 +55,8 @@ To set up and run the Python environment:
 # Install dependencies
 uv sync
 
-# Linting and Type Checking
-uv run ruff check .
-uv run mypy .
+# Run the development script (wraps ruff, mypy, and main.py)
+uv run python dev.py
 ```
 
 ## Conventions

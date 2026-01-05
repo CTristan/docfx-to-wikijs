@@ -88,7 +88,14 @@ uv run python scripts/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-
 
 ## Development
 
-This project uses `ruff` for linting and formatting, and `mypy` for static type checking.
+This project uses `ruff` for linting and formatting, and `mypy` for static type checking. A convenience script `dev.py` is provided to run the full pipeline in sequence.
+
+```bash
+# Run Development Pipeline (Ruff -> Mypy -> Main Build)
+uv run python dev.py
+```
+
+Or run tools individually:
 
 ```bash
 # Run linter
