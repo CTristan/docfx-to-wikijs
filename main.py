@@ -1,3 +1,5 @@
+"""Main orchestration script for generating DocFX metadata and Wiki.js documentation."""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,7 @@ def run_command(cmd_list, cwd=None) -> None:
 
 
 def main() -> None:
+    """Run the full documentation generation pipeline."""
     root_dir = Path(__file__).parent
 
     # 1. Generate YAML metadata using dotnet docfx
@@ -24,7 +27,7 @@ def main() -> None:
 
     # 2. Convert YAML to Wiki.js Markdown
     print("\n--- Step 2: Converting YAML to Wiki.js Markdown ---")
-    script_path = root_dir / "scripts" / "docfx_yml_to_wikijs.py"
+    script_path = root_dir / "src" / "docfx_yml_to_wikijs.py"
     yml_dir = root_dir / "api"
     out_dir = root_dir / "wikijs_out"
 

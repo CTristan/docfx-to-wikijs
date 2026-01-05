@@ -68,7 +68,7 @@ This populates the `api/` directory with `.yml` files.
 Run the conversion script to transform the YAML metadata into Markdown:
 
 ```bash
-uv run python scripts/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-pages --include-member-details --home-page
+uv run python src/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-pages --include-member-details --home-page
 ```
 
 *   `api`: Input directory containing DocFX YAML files.
@@ -82,25 +82,38 @@ uv run python scripts/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-
 *   **`assemblies/`**: Input directory for game assemblies (DLLs).
 *   **`api/`**: Intermediate output directory for DocFX YAML metadata.
 *   **`wikijs_out/`**: Final output directory containing Wiki.js-compatible Markdown.
-*   **`scripts/`**: Contains the conversion logic (`docfx_yml_to_wikijs.py`).
+*   **`src/`**: Contains the conversion logic (`docfx_yml_to_wikijs.py`).
 *   **`main.py`**: Orchestration script to run the full build process.
 *   **`docfx.json`**: Configuration file for DocFX.
 
 ## Development
 
-This project uses `ruff` for linting and formatting, and `mypy` for static type checking. A convenience script `dev.py` is provided to run the full pipeline in sequence.
+This project uses `ruff` for linting and formatting, `mypy` for static type checking, and `pytest` for unit testing. A convenience script `dev.py` is provided to run the full pipeline in sequence.
 
 ```bash
-# Run Development Pipeline (Ruff -> Mypy -> Main Build)
+# Run Development Pipeline (Format -> Lint -> Type Check -> Test -> Main Build)
 uv run python dev.py
+```
+
+To run only the checks and tests (useful for CI):
+
+```bash
+# Run CI Checks (Format -> Lint -> Type Check -> Test)
+uv run python dev.py --ci
 ```
 
 Or run tools individually:
 
 ```bash
+# Run formatter
+uv run ruff format .
+
 # Run linter
 uv run ruff check .
 
 # Run type checker
 uv run mypy .
+
+# Run unit tests
+uv run pytest
 ```
