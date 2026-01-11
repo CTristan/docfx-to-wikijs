@@ -9,7 +9,8 @@
         }
       ],
       "output": "api",
-      "globalNamespaceId": "Global"
+      "globalNamespaceId": "Global",
+      "includePrivateMembers": true
     }
   ],
   "build": {
