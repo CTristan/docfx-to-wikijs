@@ -26,15 +26,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 1. Run CI Gate (Format, Lint, Types, Tests)
-    run_command(
-        ["./scripts/ci-gate.sh"],
-        "CI Gate Checks",
-    )
-
     if args.ci:
+        run_command(["./scripts/ci-gate.sh"], "CI Gate Checks")
         print("\n✅ CI checks passed successfully. Skipping execution of main.py.")
         return
+
+    # Run auto-formatting and fixing
+    run_command(["uv", "run", "ruff", "format"], "Ruff Formatting")
+    run_command(
+        ["uv", "run", "ruff", "check", "--fix", "--unsafe-fixes"],
+        "Ruff Linting & Fixes",
+    )
+
+    # Run the CI gate to verify everything
+    run_command(["./scripts/ci-gate.sh"], "CI Gate Checks")
 
     # 5. Run main.py
     run_command(

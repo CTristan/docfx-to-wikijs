@@ -2,14 +2,14 @@
 set -e
 
 echo ""
-echo "--- Running Step: Ruff Formatting ---"
-echo "$ uv run ruff format"
-uv run ruff format
+echo "--- Running Step: Ruff Formatting (Check) ---"
+echo "$ uv run ruff format --check"
+uv run ruff format --check
 
 echo ""
-echo "--- Running Step: Ruff Linting & Fixes ---"
-echo "$ uv run ruff check --fix --unsafe-fixes"
-uv run ruff check --fix --unsafe-fixes
+echo "--- Running Step: Ruff Linting ---"
+echo "$ uv run ruff check"
+uv run ruff check
 
 echo ""
 echo "--- Running Step: Mypy Type Checking ---"
