@@ -26,28 +26,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 1. Run Ruff Format
+    # 1. Run CI Gate (Format, Lint, Types, Tests)
     run_command(
-        ["uv", "run", "ruff", "format"],
-        "Ruff Formatting",
-    )
-
-    # 2. Run Ruff
-    run_command(
-        ["uv", "run", "ruff", "check", "--fix", "--unsafe-fixes"],
-        "Ruff Linting & Fixes",
-    )
-
-    # 3. Run Mypy
-    run_command(
-        ["uv", "run", "mypy", "."],
-        "Mypy Type Checking",
-    )
-
-    # 4. Run Pytest
-    run_command(
-        ["uv", "run", "pytest"],
-        "Pytest Unit Tests",
+        ["./scripts/ci-gate.sh"],
+        "CI Gate Checks",
     )
 
     if args.ci:

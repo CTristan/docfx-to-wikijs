@@ -7,6 +7,7 @@ from unittest.mock import patch
 from docfx_yml_to_wikijs import (
     ItemInfo,
     LinkTarget,
+    _render_uid_list,
     as_text,
     build_link_targets,
     dot_safe,
@@ -202,6 +203,32 @@ def test_build_link_targets() -> None:
     # Check external ref
     assert "System.String" in targets
     assert targets["System.String"].page_path == "https://msdn.com/String"
+
+
+def test_build_link_targets_definition_resolution() -> None:
+    """Test building link targets using definition fallback."""
+    uid_to_item: dict[str, ItemInfo] = {}
+    uid_to_ref = {
+        "System.Collections.Generic.List{System.String}": {
+            "uid": "System.Collections.Generic.List{System.String}",
+            "definition": "System.Collections.Generic.List`1",
+        },
+        "System.Collections.Generic.List`1": {
+            "uid": "System.Collections.Generic.List`1",
+            "name": "List<T>",
+            "href": "https://msdn.com/List1",
+        },
+    }
+
+    targets = build_link_targets(uid_to_item, uid_to_ref, "/api")
+
+    # Generic instance should resolve to its definition's href
+    assert "System.Collections.Generic.List{System.String}" in targets
+    assert (
+        targets["System.Collections.Generic.List{System.String}"].page_path
+        == "https://msdn.com/List1"
+    )
+    assert targets["System.Collections.Generic.List{System.String}"].title == "List<T>"
 
 
 def test_rewrite_xrefs() -> None:
@@ -422,3 +449,24 @@ def test_main_integration(tmp_path: Path) -> None:
 
     content = (out / "api/My-Class.md").read_text(encoding="utf-8")
     assert "# Class Class" in content
+
+
+def test_render_uid_list() -> None:
+    """Test rendering lists of UIDs in different formats."""
+    uid_targets = {
+        "A": LinkTarget(title="Alpha", page_path="/api/Alpha"),
+    }
+
+    # Case 1: Empty
+    assert _render_uid_list("Title", [], uid_targets) == []
+
+    # Case 2: Comma separated, mixed resolution
+    md_comma = _render_uid_list("Title", ["A", "B.C"], uid_targets)
+    assert "## Title" in md_comma
+    assert "[Alpha](/api/Alpha), `C`" in md_comma
+
+    # Case 3: Bulleted
+    md_bullets = _render_uid_list("Title", ["A", "B.C"], uid_targets, bulleted=True)
+    assert "## Title" in md_bullets
+    assert "- [Alpha](/api/Alpha)" in md_bullets
+    assert "- `C`" in md_bullets

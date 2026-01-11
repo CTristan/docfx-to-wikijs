@@ -223,22 +223,24 @@ def output_file_for_page(out_root: Path, page_path: str) -> Path:
 # -----------------------------
 
 
-def build_link_targets(
+def _add_internal_page_targets(
+    targets: dict[str, LinkTarget],
     uid_to_item: dict[str, ItemInfo],
-    uid_to_ref: dict[str, dict[str, Any]],
     api_root: str,
-) -> dict[str, LinkTarget]:
-    """Build a map of UIDs to link targets."""
-    targets: dict[str, LinkTarget] = {}
-
-    # 1. Internal types and namespaces (pages)
+) -> None:
+    """Add targets for internal types and namespaces (pages)."""
     for uid, item in uid_to_item.items():
         if is_namespace_kind(item.kind) or is_type_kind(item.kind):
             page = page_path_for_fullname(api_root, item.full_name)
             title = item.name or item.full_name or uid
             targets[uid] = LinkTarget(title=title, page_path=page)
 
-    # 2. Members (anchors on internal pages)
+
+def _add_member_anchor_targets(
+    targets: dict[str, LinkTarget],
+    uid_to_item: dict[str, ItemInfo],
+) -> None:
+    """Add targets for members (anchors on internal pages)."""
     for uid, item in uid_to_item.items():
         if is_member_kind(item.kind) and item.parent:
             parent_target = targets.get(item.parent)
@@ -248,17 +250,16 @@ def build_link_targets(
                 title = item.name or item.full_name or uid
                 targets[uid] = LinkTarget(title=title, page_path=page_with_anchor)
 
-    # 3. References (external or internal)
+
+def _add_reference_targets(
+    targets: dict[str, LinkTarget],
+    uid_to_ref: dict[str, dict[str, Any]],
+) -> None:
+    """Add targets from external or internal references."""
+    # Pass 1: Direct hrefs and initial population
     for uid, ref in uid_to_ref.items():
         if uid in targets:
             continue
-
-        # Try to resolve via definition
-        definition = ref.get("definition")
-        if definition and str(definition) in targets:
-            targets[uid] = targets[str(definition)]
-            continue
-
         href = ref.get("href")
         title = ref.get("name") or ref.get("fullName") or uid
         if href:
@@ -266,6 +267,30 @@ def build_link_targets(
         else:
             targets[uid] = LinkTarget(title=str(title), page_path="#")
 
+    # Pass 2: Resolve via definition for those still without a real page_path (i.e. "#")
+    for uid, ref in uid_to_ref.items():
+        if targets[uid].page_path == "#":
+            definition = ref.get("definition")
+            if definition and str(definition) in targets:
+                d_target = targets[str(definition)]
+                if d_target.page_path != "#":
+                    # Use definition's title if our title is just the UID
+                    title = targets[uid].title
+                    if title == uid:
+                        title = d_target.title
+                    targets[uid] = LinkTarget(title=title, page_path=d_target.page_path)
+
+
+def build_link_targets(
+    uid_to_item: dict[str, ItemInfo],
+    uid_to_ref: dict[str, dict[str, Any]],
+    api_root: str,
+) -> dict[str, LinkTarget]:
+    """Build a map of UIDs to link targets."""
+    targets: dict[str, LinkTarget] = {}
+    _add_internal_page_targets(targets, uid_to_item, api_root)
+    _add_member_anchor_targets(targets, uid_to_item)
+    _add_reference_targets(targets, uid_to_ref)
     return targets
 
 
@@ -510,26 +535,45 @@ def _render_member_exceptions(
     return parts
 
 
+def _render_uid_list(
+    title: str,
+    uids: list[str],
+    uid_targets: dict[str, LinkTarget],
+    *,
+    bulleted: bool = False,
+) -> list[str]:
+    """Render a list of UIDs as links or backticks."""
+    if not uids:
+        return []
+
+    parts = [f"## {title}"]
+    links = []
+    for uid in uids:
+        t = uid_targets.get(uid)
+        if t:
+            link = f"[{t.title}]({t.page_path})"
+        else:
+            name = uid.split(".")[-1]
+            link = f"`{name}`"
+
+        if bulleted:
+            parts.append(f"- {link}")
+        else:
+            links.append(link)
+
+    if not bulleted:
+        parts.append(", ".join(links))
+
+    parts.append("")
+    return parts
+
+
 def _render_type_implements(
     item: ItemInfo,
     uid_targets: dict[str, LinkTarget],
 ) -> list[str]:
     """Render implements list."""
-    parts = []
-    implements = item.raw.get("implements") or []
-    if implements:
-        parts.append("## Implements")
-        links = []
-        for uid in implements:
-            t = uid_targets.get(uid)
-            if t:
-                links.append(f"[{t.title}]({t.page_path})")
-            else:
-                name = uid.split(".")[-1]
-                links.append(f"`{name}`")
-        parts.append(", ".join(links))
-        parts.append("")
-    return parts
+    return _render_uid_list("Implements", item.raw.get("implements") or [], uid_targets)
 
 
 def _render_type_derived(
@@ -537,21 +581,9 @@ def _render_type_derived(
     uid_targets: dict[str, LinkTarget],
 ) -> list[str]:
     """Render derived classes list."""
-    parts = []
-    derived = item.raw.get("derivedClasses") or []
-    if derived:
-        parts.append("## Derived")
-        links = []
-        for uid in derived:
-            t = uid_targets.get(uid)
-            if t:
-                links.append(f"[{t.title}]({t.page_path})")
-            else:
-                name = uid.split(".")[-1]
-                links.append(f"`{name}`")
-        parts.append(", ".join(links))
-        parts.append("")
-    return parts
+    return _render_uid_list(
+        "Derived", item.raw.get("derivedClasses") or [], uid_targets
+    )
 
 
 def _render_type_extension_methods(
@@ -559,19 +591,12 @@ def _render_type_extension_methods(
     uid_targets: dict[str, LinkTarget],
 ) -> list[str]:
     """Render extension methods list."""
-    parts = []
-    ext_methods = item.raw.get("extensionMethods") or []
-    if ext_methods:
-        parts.append("## Extension Methods")
-        for uid in ext_methods:
-            t = uid_targets.get(uid)
-            if t:
-                parts.append(f"- [{t.title}]({t.page_path})")
-            else:
-                name = uid.split(".")[-1]
-                parts.append(f"- `{name}`")
-        parts.append("")
-    return parts
+    return _render_uid_list(
+        "Extension Methods",
+        item.raw.get("extensionMethods") or [],
+        uid_targets,
+        bulleted=True,
+    )
 
 
 def _render_member(
