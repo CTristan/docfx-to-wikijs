@@ -455,7 +455,9 @@ def test_render_type_relationships() -> None:
     uid_targets = {
         "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
         "InterfaceA": LinkTarget(title="Interface A", page_path="/api/InterfaceA"),
-        "DerivedClass": LinkTarget(title="Derived Class", page_path="/api/DerivedClass"),
+        "DerivedClass": LinkTarget(
+            title="Derived Class", page_path="/api/DerivedClass"
+        ),
         "ExtMethod": LinkTarget(title="ExtMethod", page_path="/api/ExtMethod"),
     }
 
@@ -496,4 +498,3 @@ def test_render_type_relationships() -> None:
     assert "## Extension Methods" in md
     assert "- [ExtMethod](/api/ExtMethod)" in md
     assert "- `UnknownExt`" in md
-
