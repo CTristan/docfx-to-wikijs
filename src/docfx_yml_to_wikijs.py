@@ -252,6 +252,13 @@ def build_link_targets(
     for uid, ref in uid_to_ref.items():
         if uid in targets:
             continue
+
+        # Try to resolve via definition
+        definition = ref.get("definition")
+        if definition and str(definition) in targets:
+            targets[uid] = targets[str(definition)]
+            continue
+
         href = ref.get("href")
         title = ref.get("name") or ref.get("fullName") or uid
         if href:
@@ -503,6 +510,70 @@ def _render_member_exceptions(
     return parts
 
 
+def _render_type_implements(
+    item: ItemInfo,
+    uid_targets: dict[str, LinkTarget],
+) -> list[str]:
+    """Render implements list."""
+    parts = []
+    implements = item.raw.get("implements") or []
+    if implements:
+        parts.append("## Implements")
+        links = []
+        for uid in implements:
+            t = uid_targets.get(uid)
+            if t:
+                links.append(f"[{t.title}]({t.page_path})")
+            else:
+                name = uid.split(".")[-1]
+                links.append(f"`{name}`")
+        parts.append(", ".join(links))
+        parts.append("")
+    return parts
+
+
+def _render_type_derived(
+    item: ItemInfo,
+    uid_targets: dict[str, LinkTarget],
+) -> list[str]:
+    """Render derived classes list."""
+    parts = []
+    derived = item.raw.get("derivedClasses") or []
+    if derived:
+        parts.append("## Derived")
+        links = []
+        for uid in derived:
+            t = uid_targets.get(uid)
+            if t:
+                links.append(f"[{t.title}]({t.page_path})")
+            else:
+                name = uid.split(".")[-1]
+                links.append(f"`{name}`")
+        parts.append(", ".join(links))
+        parts.append("")
+    return parts
+
+
+def _render_type_extension_methods(
+    item: ItemInfo,
+    uid_targets: dict[str, LinkTarget],
+) -> list[str]:
+    """Render extension methods list."""
+    parts = []
+    ext_methods = item.raw.get("extensionMethods") or []
+    if ext_methods:
+        parts.append("## Extension Methods")
+        for uid in ext_methods:
+            t = uid_targets.get(uid)
+            if t:
+                parts.append(f"- [{t.title}]({t.page_path})")
+            else:
+                name = uid.split(".")[-1]
+                parts.append(f"- `{name}`")
+        parts.append("")
+    return parts
+
+
 def _render_member(
     m: ItemInfo,
     uid_targets: dict[str, LinkTarget],
@@ -625,7 +696,10 @@ def render_type_page(
         parts += [md_codeblock("csharp", sig), ""]
 
     parts.extend(_render_type_inheritance(item, uid_targets))
+    parts.extend(_render_type_derived(item, uid_targets))
+    parts.extend(_render_type_implements(item, uid_targets))
     parts.extend(_render_type_inherited_members(item, uid_targets))
+    parts.extend(_render_type_extension_methods(item, uid_targets))
 
     # Remarks / Examples
     remarks = rewrite_xrefs(as_text(raw.get("remarks")), uid_targets)
