@@ -7,7 +7,6 @@ from unittest.mock import patch
 from docfx_yml_to_wikijs import (
     ItemInfo,
     LinkTarget,
-    _render_uid_list,
     as_text,
     build_link_targets,
     dot_safe,
@@ -451,22 +450,50 @@ def test_main_integration(tmp_path: Path) -> None:
     assert "# Class Class" in content
 
 
-def test_render_uid_list() -> None:
-    """Test rendering lists of UIDs in different formats."""
+def test_render_type_relationships() -> None:
+    """Test rendering type relationships (implements, derived, extensions)."""
     uid_targets = {
-        "A": LinkTarget(title="Alpha", page_path="/api/Alpha"),
+        "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
+        "InterfaceA": LinkTarget(title="Interface A", page_path="/api/InterfaceA"),
+        "DerivedClass": LinkTarget(title="Derived Class", page_path="/api/DerivedClass"),
+        "ExtMethod": LinkTarget(title="ExtMethod", page_path="/api/ExtMethod"),
     }
 
-    # Case 1: Empty
-    assert _render_uid_list("Title", [], uid_targets) == []
+    item = ItemInfo(
+        uid="My.Class",
+        kind="Class",
+        name="Class",
+        full_name="My.Class",
+        parent="My",
+        namespace="My",
+        summary="Summary",
+        file=Path(),
+        raw={
+            # Implements (comma separated)
+            "implements": ["InterfaceA", "UnknownInterface"],
+            # Derived (comma separated) - usually "derivedClasses"
+            "derivedClasses": ["DerivedClass", "UnknownDerived"],
+            # Extension Methods (bulleted)
+            "extensionMethods": ["ExtMethod", "UnknownExt"],
+        },
+    )
 
-    # Case 2: Comma separated, mixed resolution
-    md_comma = _render_uid_list("Title", ["A", "B.C"], uid_targets)
-    assert "## Title" in md_comma
-    assert "[Alpha](/api/Alpha), `C`" in md_comma
+    md = render_type_page(item, {}, uid_targets, include_member_details=False)
 
-    # Case 3: Bulleted
-    md_bullets = _render_uid_list("Title", ["A", "B.C"], uid_targets, bulleted=True)
-    assert "## Title" in md_bullets
-    assert "- [Alpha](/api/Alpha)" in md_bullets
-    assert "- `C`" in md_bullets
+    # Check Implements (comma separated)
+    assert "## Implements" in md
+    # We expect links/code to be present.
+    # The current implementation joins them with ", " after the header.
+    assert "[Interface A](/api/InterfaceA)" in md
+    assert "`UnknownInterface`" in md
+
+    # Check Derived (comma separated)
+    assert "## Derived" in md
+    assert "[Derived Class](/api/DerivedClass)" in md
+    assert "`UnknownDerived`" in md
+
+    # Check Extension Methods (bulleted)
+    assert "## Extension Methods" in md
+    assert "- [ExtMethod](/api/ExtMethod)" in md
+    assert "- `UnknownExt`" in md
+

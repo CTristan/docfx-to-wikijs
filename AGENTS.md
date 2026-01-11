@@ -81,6 +81,7 @@ uv run python dev.py
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
 - **Top-Level Imports (PLC0415)**: Avoid `import` statements outside of a module's top-level scope (e.g., inside functions). Place them at the top of the file to clarify dependencies and avoid hidden side effects, unless necessary for avoiding circular dependencies or deferred loading.
+- **Testing**: Avoid importing and testing private functions (prefixed with `_`) directly. Instead, test their functionality through the public API they support.
 
 ## Gemini Added Memories
 - The user prefers to document breaking changes in `docs/decisions/` rather than complex migration paths for internal APIs.
