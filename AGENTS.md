@@ -30,12 +30,12 @@ uv run python main.py
 ```
 
 #### Development Cycle (Recommended)
-To run the full development pipeline (Linting -> Type Checking -> Build):
+To run the full development pipeline (Auto-fix -> Linting -> Type Checking -> Build):
 ```bash
 uv run python dev.py
 ```
 
-To run only the verification steps (Linting -> Type Checking -> Tests) without the build:
+To run only the verification steps (Linting -> Type Checking -> Tests) without the build or auto-fixing:
 ```bash
 uv run python dev.py --ci
 ```
@@ -44,7 +44,7 @@ uv run python dev.py --ci
 The project uses GitHub Actions for CI. The workflow is defined in `.github/workflows/ci-gate.yml` and performs the following checks on Pull Requests:
 1.  **Setup**: Installs Python 3.12 and `uv`.
 2.  **Dependencies**: Installs dependencies using `uv sync --frozen`.
-3.  **Verification**: Runs `uv run python dev.py --ci`.
+3.  **Verification**: Runs `./scripts/ci-gate.sh` directly (strict check mode).
 4.  **Artifacts**: Uploads coverage reports.
 
 #### Documentation Build (Standard DocFX)
@@ -81,3 +81,8 @@ uv run python dev.py
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
 - **Top-Level Imports (PLC0415)**: Avoid `import` statements outside of a module's top-level scope (e.g., inside functions). Place them at the top of the file to clarify dependencies and avoid hidden side effects, unless necessary for avoiding circular dependencies or deferred loading.
+
+## Gemini Added Memories
+- The user prefers to document breaking changes in `docs/decisions/` rather than complex migration paths for internal APIs.
+- The `scripts/run_checks.sh` script (referred to as `scripts/ci-gate.sh` in context) now runs ruff in check-only mode. `dev.py` handles the auto-fixing logic before calling the gate script, unless `--ci` is passed.
+- CI workflow (`.github/workflows/ci-gate.yml`) now invokes `./scripts/ci-gate.sh` directly instead of via `dev.py` to ensure strict checking without Python overhead.
