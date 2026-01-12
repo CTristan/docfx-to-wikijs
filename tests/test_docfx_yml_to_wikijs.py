@@ -204,6 +204,32 @@ def test_build_link_targets() -> None:
     assert targets["System.String"].page_path == "https://msdn.com/String"
 
 
+def test_build_link_targets_definition_resolution() -> None:
+    """Test building link targets using definition fallback."""
+    uid_to_item: dict[str, ItemInfo] = {}
+    uid_to_ref = {
+        "System.Collections.Generic.List{System.String}": {
+            "uid": "System.Collections.Generic.List{System.String}",
+            "definition": "System.Collections.Generic.List`1",
+        },
+        "System.Collections.Generic.List`1": {
+            "uid": "System.Collections.Generic.List`1",
+            "name": "List<T>",
+            "href": "https://msdn.com/List1",
+        },
+    }
+
+    targets = build_link_targets(uid_to_item, uid_to_ref, "/api")
+
+    # Generic instance should resolve to its definition's href
+    assert "System.Collections.Generic.List{System.String}" in targets
+    assert (
+        targets["System.Collections.Generic.List{System.String}"].page_path
+        == "https://msdn.com/List1"
+    )
+    assert targets["System.Collections.Generic.List{System.String}"].title == "List<T>"
+
+
 def test_rewrite_xrefs() -> None:
     """Test rewriting XRef tags to Markdown links."""
     targets = {
@@ -422,3 +448,53 @@ def test_main_integration(tmp_path: Path) -> None:
 
     content = (out / "api/My-Class.md").read_text(encoding="utf-8")
     assert "# Class Class" in content
+
+
+def test_render_type_relationships() -> None:
+    """Test rendering type relationships (implements, derived, extensions)."""
+    uid_targets = {
+        "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
+        "InterfaceA": LinkTarget(title="Interface A", page_path="/api/InterfaceA"),
+        "DerivedClass": LinkTarget(
+            title="Derived Class", page_path="/api/DerivedClass"
+        ),
+        "ExtMethod": LinkTarget(title="ExtMethod", page_path="/api/ExtMethod"),
+    }
+
+    item = ItemInfo(
+        uid="My.Class",
+        kind="Class",
+        name="Class",
+        full_name="My.Class",
+        parent="My",
+        namespace="My",
+        summary="Summary",
+        file=Path(),
+        raw={
+            # Implements (comma separated)
+            "implements": ["InterfaceA", "UnknownInterface"],
+            # Derived (comma separated) - usually "derivedClasses"
+            "derivedClasses": ["DerivedClass", "UnknownDerived"],
+            # Extension Methods (bulleted)
+            "extensionMethods": ["ExtMethod", "UnknownExt"],
+        },
+    )
+
+    md = render_type_page(item, {}, uid_targets, include_member_details=False)
+
+    # Check Implements (comma separated)
+    assert "## Implements" in md
+    # We expect links/code to be present.
+    # The current implementation joins them with ", " after the header.
+    assert "[Interface A](/api/InterfaceA)" in md
+    assert "`UnknownInterface`" in md
+
+    # Check Derived (comma separated)
+    assert "## Derived" in md
+    assert "[Derived Class](/api/DerivedClass)" in md
+    assert "`UnknownDerived`" in md
+
+    # Check Extension Methods (bulleted)
+    assert "## Extension Methods" in md
+    assert "- [ExtMethod](/api/ExtMethod)" in md
+    assert "- `UnknownExt`" in md

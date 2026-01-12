@@ -37,7 +37,7 @@ jobs:
           uv sync --frozen
 
       - name: Run checks
-        run: uv run python dev.py --ci
+        run: ./scripts/ci-gate.sh
         env:
           # Enable strict mode or CI specific flags if needed by tools
           CI: true
