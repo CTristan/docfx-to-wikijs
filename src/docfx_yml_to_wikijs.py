@@ -203,6 +203,11 @@ def is_member_kind(kind: str) -> bool:
     return k in {"method", "property", "field", "event", "operator", "constructor"}
 
 
+def _should_use_global_dir(namespace: str | None) -> bool:
+    """Check if the item belongs in the Global directory."""
+    return namespace is None or namespace == "Global"
+
+
 def page_path_for_fullname(
     api_root: str,
     full_name: str,
@@ -241,8 +246,8 @@ def _add_internal_page_targets(
     """Add targets for internal types and namespaces (pages)."""
     for uid, item in uid_to_item.items():
         if is_namespace_kind(item.kind) or is_type_kind(item.kind):
-            use_global = is_type_kind(item.kind) and (
-                not item.namespace or item.namespace == "Global"
+            use_global = is_type_kind(item.kind) and _should_use_global_dir(
+                item.namespace
             )
             page = page_path_for_fullname(
                 api_root,
@@ -376,7 +381,7 @@ def render_namespace_page(
                 page = page_path_for_fullname(
                     api_root,
                     t.full_name,
-                    use_global_dir=(not t.namespace or t.namespace == "Global"),
+                    use_global_dir=_should_use_global_dir(t.namespace),
                 )
                 summ = rewrite_xrefs(t.summary, uid_targets).replace("\n", " ").strip()
                 if summ:
@@ -798,7 +803,7 @@ def _write_type_pages(
     total_types = len(type_items)
     print(f"Writing {total_types} type pages...")
     for it in type_items:
-        use_global = (not it.namespace) or (it.namespace == "Global")
+        use_global = _should_use_global_dir(it.namespace)
         page_path = page_path_for_fullname(
             args.api_root,
             it.full_name,

@@ -452,6 +452,10 @@ def test_main_integration(tmp_path: Path) -> None:
     (src / "test.yml").write_text(
         "### YamlMime:ManagedReference\n"
         "items:\n"
+        "  - uid: My\n"
+        "    type: Namespace\n"
+        "    name: My\n"
+        "    fullName: My\n"
         "  - uid: My.Class\n"
         "    type: Class\n"
         "    name: Class\n"
@@ -481,6 +485,20 @@ def test_main_integration(tmp_path: Path) -> None:
     with patch.object(sys, "argv", test_args):
         ret = main()
         assert ret == 0
+
+    # Verify output files
+    assert (out / "home.md").exists()
+    assert (out / "api/My/Class.md").exists()
+    assert (out / "api/Global/GlobalClass.md").exists()
+    assert (out / "api/My.md").exists()
+
+    # Verify content
+    class_content = (out / "api/My/Class.md").read_text(encoding="utf-8")
+    assert "# Class Class" in class_content
+    assert "**Namespace:** [My](/api/My)" in class_content
+
+    global_content = (out / "api/Global/GlobalClass.md").read_text(encoding="utf-8")
+    assert "# Class GlobalClass" in global_content
 
 
 def test_main_integration_global_explicit_namespace(tmp_path: Path) -> None:
