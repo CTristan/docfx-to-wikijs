@@ -203,10 +203,25 @@ def is_member_kind(kind: str) -> bool:
     return k in {"method", "property", "field", "event", "operator", "constructor"}
 
 
-def page_path_for_fullname(api_root: str, full_name: str) -> str:
+def _should_use_global_dir(namespace: str | None) -> bool:
+    """Check if the item belongs in the Global directory."""
+    return namespace is None or namespace == "Global"
+
+
+def page_path_for_fullname(
+    api_root: str,
+    full_name: str,
+    *,
+    use_global_dir: bool = False,
+) -> str:
     """Generate the Wiki.js page path for a given full name."""
-    # Flattened hyphenated filenames: Foo.Bar.Baz -> /api/Foo-Bar-Baz
-    return f"{api_root}/{dot_safe(full_name)}"
+    # Subfolders: Foo.Bar.Baz -> /api/Foo/Bar/Baz
+    parts = full_name.split(".")
+    processed = [dot_safe(p) for p in parts]
+    if use_global_dir:
+        processed.insert(0, "Global")
+    path = "/".join(processed)
+    return f"{api_root}/{path}"
 
 
 def output_file_for_page(out_root: Path, page_path: str) -> Path:
@@ -231,7 +246,14 @@ def _add_internal_page_targets(
     """Add targets for internal types and namespaces (pages)."""
     for uid, item in uid_to_item.items():
         if is_namespace_kind(item.kind) or is_type_kind(item.kind):
-            page = page_path_for_fullname(api_root, item.full_name)
+            use_global = is_type_kind(item.kind) and _should_use_global_dir(
+                item.namespace
+            )
+            page = page_path_for_fullname(
+                api_root,
+                item.full_name,
+                use_global_dir=use_global,
+            )
             title = item.name or item.full_name or uid
             targets[uid] = LinkTarget(title=title, page_path=page)
 
@@ -356,7 +378,11 @@ def render_namespace_page(
             )
             parts += [f"## {plural}", ""]
             for t in sorted(matches, key=lambda x: x.name.lower()):
-                page = page_path_for_fullname(api_root, t.full_name)
+                page = page_path_for_fullname(
+                    api_root,
+                    t.full_name,
+                    use_global_dir=_should_use_global_dir(t.namespace),
+                )
                 summ = rewrite_xrefs(t.summary, uid_targets).replace("\n", " ").strip()
                 if summ:
                     parts.append(f"### [{t.name}]({page})")
@@ -777,7 +803,12 @@ def _write_type_pages(
     total_types = len(type_items)
     print(f"Writing {total_types} type pages...")
     for it in type_items:
-        page_path = page_path_for_fullname(args.api_root, it.full_name)
+        use_global = _should_use_global_dir(it.namespace)
+        page_path = page_path_for_fullname(
+            args.api_root,
+            it.full_name,
+            use_global_dir=use_global,
+        )
         md = render_type_page(
             it,
             uid_to_item=uid_to_item,
