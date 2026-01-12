@@ -76,7 +76,7 @@ uv run python dev.py
 - **API Generation**: The project relies on `assemblies/Assembly-CSharp.dll` as the primary source for API documentation. Avoid manually editing generated files in `api/` unless you are sure they won't be overwritten.
 - **API Scope**: Private members are explicitly included in the generated API documentation (via `docfx.json` configuration) to provide full internal visibility of the game's codebase.
 - **Conversion Logic**: Modifications to the Wiki.js output format should be made in `src/docfx_yml_to_wikijs.py`.
-- **Output Naming**: Generated Markdown files use hyphens instead of periods for namespaces and types (e.g., `My-Namespace-Class.md`) to ensure compatibility with Wiki.js, which restricts special characters in page paths.
+- **Output Naming**: Generated Markdown files use subdirectories for namespaces (e.g., `My/Namespace/Class.md`) instead of hyphenated filenames. Types in the global namespace are placed in a `Global/` subdirectory (e.g., `Global/MyClass.md`). Periods are replaced with hyphens within path segments for Wiki.js compatibility.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.

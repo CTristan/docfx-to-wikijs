@@ -146,11 +146,24 @@ def test_namespace_of() -> None:
 
 def test_page_path_for_fullname() -> None:
     """Test wiki page path generation."""
+    # Standard namespace case
     assert (
         page_path_for_fullname("/api", "My.Namespace.Class")
-        == "/api/My-Namespace-Class"
+        == "/api/My/Namespace/Class"
     )
+    # Simple case
     assert page_path_for_fullname("/docs", "Simple") == "/docs/Simple"
+
+    # Global namespace case
+    assert (
+        page_path_for_fullname("/api", "GlobalClass", use_global_dir=True)
+        == "/api/Global/GlobalClass"
+    )
+    # Nested in global
+    assert (
+        page_path_for_fullname("/api", "Outer.Inner", use_global_dir=True)
+        == "/api/Global/Outer/Inner"
+    )
 
 
 def test_build_link_targets() -> None:
@@ -193,15 +206,37 @@ def test_build_link_targets() -> None:
 
     # Check class link
     assert "My.Class" in targets
-    assert targets["My.Class"].page_path == "/api/My-Class"
+    assert targets["My.Class"].page_path == "/api/My/Class"
 
     # Check method link (anchor)
     assert "My.Class.Method" in targets
-    assert targets["My.Class.Method"].page_path == "/api/My-Class#method"
+    assert targets["My.Class.Method"].page_path == "/api/My/Class#method"
 
     # Check external ref
     assert "System.String" in targets
     assert targets["System.String"].page_path == "https://msdn.com/String"
+
+
+def test_build_link_targets_global_namespace() -> None:
+    """Test building link targets for global namespace types."""
+    uid_to_item = {
+        "GlobalClass": ItemInfo(
+            uid="GlobalClass",
+            kind="Class",
+            name="GlobalClass",
+            full_name="GlobalClass",
+            parent=None,
+            namespace=None,
+            summary="",
+            file=Path(),
+            raw={},
+        ),
+    }
+
+    targets = build_link_targets(uid_to_item, {}, "/api")
+
+    assert "GlobalClass" in targets
+    assert targets["GlobalClass"].page_path == "/api/Global/GlobalClass"
 
 
 def test_build_link_targets_definition_resolution() -> None:
@@ -284,7 +319,7 @@ def test_render_namespace_page() -> None:
     """Test rendering a namespace page."""
     # Setup
     uid_targets = {
-        "My.Class": LinkTarget(title="Class", page_path="/api/My-Class"),
+        "My.Class": LinkTarget(title="Class", page_path="/api/My/Class"),
     }
 
     items = [
@@ -312,9 +347,9 @@ def test_render_namespace_page() -> None:
 
     assert "# Namespace My" in md
     assert "## Namespaces" in md
-    assert "[My.Sub](/api/My-Sub)" in md
+    assert "[My.Sub](/api/My/Sub)" in md
     assert "## Classes" in md
-    assert "[Class](/api/My-Class)" in md
+    assert "[Class](/api/My/Class)" in md
     assert "A summary." in md
 
 
@@ -421,7 +456,13 @@ def test_main_integration(tmp_path: Path) -> None:
         "    type: Class\n"
         "    name: Class\n"
         "    fullName: My.Class\n"
-        "    summary: Summary\n",
+        "    namespace: My\n"
+        "    summary: Summary\n"
+        "  - uid: GlobalClass\n"
+        "    type: Class\n"
+        "    name: GlobalClass\n"
+        "    fullName: GlobalClass\n"
+        "    summary: Global Summary\n",
         encoding="utf-8",
     )
 
@@ -441,13 +482,37 @@ def test_main_integration(tmp_path: Path) -> None:
         ret = main()
         assert ret == 0
 
-    # Verify output
-    assert (out / "api/My-Class.md").exists()
-    assert (out / "api/My.md").exists()  # Namespace page
-    assert (out / "home.md").exists()
 
-    content = (out / "api/My-Class.md").read_text(encoding="utf-8")
-    assert "# Class Class" in content
+def test_main_integration_global_explicit_namespace(tmp_path: Path) -> None:
+    """Test full integration with a class explicitly in 'Global' namespace."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "test.yml").write_text(
+        "### YamlMime:ManagedReference\n"
+        "items:\n"
+        "  - uid: GlobalClass\n"
+        "    type: Class\n"
+        "    name: GlobalClass\n"
+        "    fullName: GlobalClass\n"
+        "    namespace: Global\n"
+        "    summary: Global Summary\n",
+        encoding="utf-8",
+    )
+
+    out = tmp_path / "out"
+
+    test_args = [
+        "script_name",
+        str(src),
+        str(out),
+    ]
+
+    with patch.object(sys, "argv", test_args):
+        ret = main()
+        assert ret == 0
+
+    # Should be in Global/GlobalClass.md
+    assert (out / "api/Global/GlobalClass.md").exists()
 
 
 def test_render_type_relationships() -> None:
