@@ -17,14 +17,14 @@ def run_command(command: list[str], step_name: str) -> None:
 
 
 def main() -> None:
-    """Run the development checks and optionally the main script."""
+    """Run the development checks and main script."""
     parser = argparse.ArgumentParser(
         description="Run development checks and main script."
     )
     parser.add_argument(
         "--ci", action="store_true", help="Run checks and tests only, skipping main.py"
     )
-    args = parser.parse_args()
+    args, extra_args = parser.parse_known_args()
 
     if args.ci:
         run_command(["./scripts/ci-gate.sh"], "CI Gate Checks")
@@ -43,7 +43,7 @@ def main() -> None:
 
     # 5. Run main.py
     run_command(
-        ["uv", "run", "python", "main.py"],
+        ["uv", "run", "python", "main.py", *extra_args],
         "Main Entry Point",
     )
 
