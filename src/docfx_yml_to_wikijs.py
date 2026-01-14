@@ -11,9 +11,18 @@ import argparse
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import yaml  # type: ignore[import-untyped]
+from src.models import ItemInfo, LinkTarget
+from src.global_config import load_config, compute_config_hash
+from src.global_map import GlobalNamespaceMap, CURRENT_SCHEMA_VERSION
+from src.text_processing import Tokenizer, Sanitizer
+from src.metadata_index import MetadataIndex
+from src.analyzer import Analyzer
+from src.global_path_resolver import GlobalPathResolver, ResolutionResult
+from src.stub_generator import StubGenerator
+from src.reporting import ClusterReport
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,7 +35,7 @@ YAML_MIME_PREFIX = "### YamlMime:"
 XREF_TAG_RE = re.compile(r"<xref:([^?>#>]+)(?:\?[^>#>]*)?(?:#[^>]*)?>")
 XREF_MD_LINK_RE = re.compile(
     r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)",
-)  # (xref:UID?...)
+)  # (xref:UID?...) 
 
 # Conservative: keep letters, digits, underscore, dash. Dots are replaced with hyphens.
 DOT_SAFE_RE = re.compile(r"[^A-Za-z0-9_-]+")
@@ -64,7 +73,6 @@ def dot_safe(name: str) -> str:
     # Avoid pathological emptiness
     return name or "Unknown"
 
-
 def header_slug(s: str) -> str:
     """Generate a GitHub-ish anchor slug: lower, hyphenate non-alnum."""
     s = s.strip().lower()
@@ -72,11 +80,9 @@ def header_slug(s: str) -> str:
     s = re.sub(r"-{2,}", "-", s).strip("-")
     return s or "section"
 
-
 def md_codeblock(lang: str, code: str) -> str:
     """Generate a Markdown code block."""
     return f"```{lang}\n{code.rstrip()}\n```"
-
 
 def md_table(headers: list[str], rows: list[list[str]]) -> str:
     """Generate a Markdown table."""
@@ -91,34 +97,6 @@ def md_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 # -----------------------------
-# Data model
-# -----------------------------
-
-
-@dataclass
-class ItemInfo:
-    """Represents a documented item (class, method, etc.)."""
-
-    uid: str
-    kind: str  # Namespace/Class/Method/Property/etc.
-    name: str
-    full_name: str
-    parent: str | None
-    namespace: str | None
-    summary: str
-    file: Path
-    raw: dict[str, Any]  # original parsed item
-
-
-@dataclass(frozen=True)
-class LinkTarget:
-    """Represents a link target for an XRef."""
-
-    title: str
-    page_path: str  # Wiki path, e.g. /api/Foo.Bar
-
-
-# -----------------------------
 # Parsing and indexing
 # -----------------------------
 
@@ -127,11 +105,10 @@ def load_managed_reference(path: Path) -> dict[str, Any]:
     """Load and parse a DocFX ManagedReference YAML file."""
     raw = strip_yaml_mime_header(path.read_text(encoding="utf-8"))
     # Fix unquoted equals sign in VB names which confuses PyYAML
-    # Matches: "  name.vb: =" -> "  name.vb: '='
+    # Matches: "  name.vb: =" -> "  name.vb: '='"
     raw = re.sub(r"^(\s*[\w\.]+\.vb:\s+)(=$)", r"\1'='", raw, flags=re.MULTILINE)
     doc = yaml.safe_load(raw)
     return doc or {}
-
 
 def iter_main_items(doc: dict[str, Any]) -> Iterable[dict[str, Any]]:
     """Iterate over the main items in a DocFX YAML document."""
@@ -139,7 +116,6 @@ def iter_main_items(doc: dict[str, Any]) -> Iterable[dict[str, Any]]:
     for it in items:
         if isinstance(it, dict) and it.get("uid"):
             yield it
-
 
 def build_index(
     yml_files: list[Path],
@@ -157,6 +133,16 @@ def build_index(
             parent = it.get("parent")
             ns = it.get("namespace")
             summary = as_text(it.get("summary"))
+
+            inheritance = [
+                str(x.get("uid") if isinstance(x, dict) else x)
+                for x in (it.get("inheritance") or [])
+            ]
+            implements = [
+                str(x.get("uid") if isinstance(x, dict) else x)
+                for x in (it.get("implements") or [])
+            ]
+
             uid_to_item[uid] = ItemInfo(
                 uid=uid,
                 kind=kind,
@@ -165,6 +151,8 @@ def build_index(
                 parent=str(parent) if parent else None,
                 namespace=str(ns) if ns else None,
                 summary=summary,
+                inheritance=inheritance,
+                implements=implements,
                 file=f,
                 raw=it,
             )
@@ -172,7 +160,6 @@ def build_index(
             if isinstance(ref, dict) and ref.get("uid"):
                 uid_to_ref[str(ref["uid"])] = ref
     return uid_to_item, uid_to_ref
-
 
 def namespace_of(item: ItemInfo) -> str:
     """Determine the namespace of an item."""
@@ -185,28 +172,23 @@ def namespace_of(item: ItemInfo) -> str:
         return ".".join(parts[:-1])
     return ""
 
-
 def is_type_kind(kind: str) -> bool:
     """Check if the kind represents a type (class, struct, etc.)."""
     k = kind.lower()
     return k in {"class", "struct", "interface", "enum", "delegate"}
 
-
 def is_namespace_kind(kind: str) -> bool:
     """Check if the kind represents a namespace."""
     return kind.lower() == "namespace"
-
 
 def is_member_kind(kind: str) -> bool:
     """Check if the kind represents a member (method, property, etc.)."""
     k = kind.lower()
     return k in {"method", "property", "field", "event", "operator", "constructor"}
 
-
 def _should_use_global_dir(namespace: str | None) -> bool:
     """Check if the item belongs in the Global directory."""
     return namespace is None or namespace == "Global"
-
 
 def page_path_for_fullname(
     api_root: str,
@@ -222,7 +204,6 @@ def page_path_for_fullname(
         processed.insert(0, "Global")
     path = "/".join(processed)
     return f"{api_root}/{path}"
-
 
 def output_file_for_page(out_root: Path, page_path: str) -> Path:
     """Determine the output file path for a given Wiki.js page path."""
@@ -242,6 +223,7 @@ def _add_internal_page_targets(
     targets: dict[str, LinkTarget],
     uid_to_item: dict[str, ItemInfo],
     api_root: str,
+    global_resolved: dict[str, ResolutionResult],
 ) -> None:
     """Add targets for internal types and namespaces (pages)."""
     for uid, item in uid_to_item.items():
@@ -249,14 +231,23 @@ def _add_internal_page_targets(
             use_global = is_type_kind(item.kind) and _should_use_global_dir(
                 item.namespace
             )
-            page = page_path_for_fullname(
-                api_root,
-                item.full_name,
-                use_global_dir=use_global,
-            )
+            
+            # Check resolved global map first
+            if use_global and global_resolved and uid in global_resolved:
+                final_path = global_resolved[uid].final_path
+                # final_path is relative to api root (e.g. Global/Story/Item.md)
+                # Wiki path: /api/Global/Story/Item
+                rel = final_path.replace(".md", "")
+                page = f"{api_root}/{rel}"
+            else:
+                page = page_path_for_fullname(
+                    api_root,
+                    item.full_name,
+                    use_global_dir=use_global,
+                )
+            
             title = item.name or item.full_name or uid
             targets[uid] = LinkTarget(title=title, page_path=page)
-
 
 def _add_member_anchor_targets(
     targets: dict[str, LinkTarget],
@@ -271,7 +262,6 @@ def _add_member_anchor_targets(
                 page_with_anchor = f"{parent_target.page_path}#{anchor}"
                 title = item.name or item.full_name or uid
                 targets[uid] = LinkTarget(title=title, page_path=page_with_anchor)
-
 
 def _add_reference_targets(
     targets: dict[str, LinkTarget],
@@ -302,19 +292,18 @@ def _add_reference_targets(
                         title = d_target.title
                     targets[uid] = LinkTarget(title=title, page_path=d_target.page_path)
 
-
 def build_link_targets(
     uid_to_item: dict[str, ItemInfo],
     uid_to_ref: dict[str, dict[str, Any]],
     api_root: str,
+    global_resolved: dict[str, ResolutionResult] = None,
 ) -> dict[str, LinkTarget]:
     """Build a map of UIDs to link targets."""
     targets: dict[str, LinkTarget] = {}
-    _add_internal_page_targets(targets, uid_to_item, api_root)
+    _add_internal_page_targets(targets, uid_to_item, api_root, global_resolved or {})
     _add_member_anchor_targets(targets, uid_to_item)
     _add_reference_targets(targets, uid_to_ref)
     return targets
-
 
 def rewrite_xrefs(text: str, uid_targets: dict[str, LinkTarget]) -> str:
     """Rewrite DocFX XRef tags to Markdown links."""
@@ -378,11 +367,17 @@ def render_namespace_page(
             )
             parts += [f"## {plural}", ""]
             for t in sorted(matches, key=lambda x: x.name.lower()):
-                page = page_path_for_fullname(
-                    api_root,
-                    t.full_name,
-                    use_global_dir=_should_use_global_dir(t.namespace),
-                )
+                # Resolved path
+                t_target = uid_targets.get(t.uid)
+                if t_target:
+                    page = t_target.page_path
+                else:
+                    page = page_path_for_fullname(
+                        api_root,
+                        t.full_name,
+                        use_global_dir=_should_use_global_dir(t.namespace),
+                    )
+                
                 summ = rewrite_xrefs(t.summary, uid_targets).replace("\n", " ").strip()
                 if summ:
                     parts.append(f"### [{t.name}]({page})")
@@ -423,7 +418,8 @@ def _render_type_metadata(
     assemblies = item.raw.get("assemblies")
     if assemblies:
         formatted_assemblies = [
-            a if str(a).lower().endswith(".dll") else f"{a}.dll" for a in assemblies
+            a if str(a).lower().endswith(".dll") else f"{a}.dll"
+            for a in assemblies
         ]
         parts.append(f"**Assembly:** {', '.join(formatted_assemblies)}")
     if parts:
@@ -448,7 +444,6 @@ def _render_type_attributes(
         parts.append("")
     return parts
 
-
 def _render_type_inheritance(
     item: ItemInfo,
     uid_targets: dict[str, LinkTarget],
@@ -467,7 +462,6 @@ def _render_type_inheritance(
         parts.append(" → ".join(chain))
         parts.append("")
     return parts
-
 
 def _render_type_inherited_members(
     item: ItemInfo,
@@ -490,7 +484,6 @@ def _render_type_inherited_members(
         parts.append("")
     return parts
 
-
 def _render_member_params(
     syntax: dict[str, Any],
     uid_targets: dict[str, LinkTarget],
@@ -510,7 +503,6 @@ def _render_member_params(
         parts.append(md_table(["Name", "Type", "Description"], rows))
         parts.append("")
     return parts
-
 
 def _render_member_returns(
     m: ItemInfo,
@@ -539,7 +531,6 @@ def _render_member_returns(
             parts.append("")
     return parts
 
-
 def _render_member_exceptions(
     mraw: dict[str, Any],
     uid_targets: dict[str, LinkTarget],
@@ -559,7 +550,6 @@ def _render_member_exceptions(
                 parts.append(f"- {et}")
         parts.append("")
     return parts
-
 
 def _render_uid_list(
     title: str,
@@ -593,14 +583,12 @@ def _render_uid_list(
     parts.append("")
     return parts
 
-
 def _render_type_implements(
     item: ItemInfo,
     uid_targets: dict[str, LinkTarget],
 ) -> list[str]:
     """Render implements list."""
     return _render_uid_list("Implements", item.raw.get("implements") or [], uid_targets)
-
 
 def _render_type_derived(
     item: ItemInfo,
@@ -610,7 +598,6 @@ def _render_type_derived(
     return _render_uid_list(
         "Derived", item.raw.get("derivedClasses") or [], uid_targets
     )
-
 
 def _render_type_extension_methods(
     item: ItemInfo,
@@ -623,7 +610,6 @@ def _render_type_extension_methods(
         uid_targets,
         bulleted=True,
     )
-
 
 def _render_member(
     m: ItemInfo,
@@ -648,7 +634,6 @@ def _render_member(
     parts.extend(_render_member_exceptions(mraw, uid_targets))
 
     return parts
-
 
 def _render_type_members(
     item: ItemInfo,
@@ -698,7 +683,6 @@ def _render_type_members(
 
     return parts
 
-
 def _render_type_seealso(
     item: ItemInfo,
     uid_targets: dict[str, LinkTarget],
@@ -719,28 +703,35 @@ def _render_type_seealso(
         parts.append("")
     return parts
 
-
 def render_type_page(
     item: ItemInfo,
     uid_to_item: dict[str, ItemInfo],
     uid_targets: dict[str, LinkTarget],
     *,
     include_member_details: bool = True,
+    canonical_path: Optional[str] = None
 ) -> str:
     """Render a type page (class, struct, etc.) in Markdown."""
+    parts = []
+    if canonical_path or item.uid:
+        parts.append("---")
+        parts.append(f"uid: {item.uid}")
+        if canonical_path:
+             parts.append(f"canonical_path: {canonical_path}")
+        parts.append("---")
+        parts.append("")
+
     raw = item.raw
     kind_label = item.kind.capitalize()
-    parts: list[str] = [f"# {kind_label} {item.name}", ""]
+    parts += [f"# {kind_label} {item.name}", ""]
 
     parts.extend(_render_type_metadata(item, uid_targets))
     parts.extend(_render_type_attributes(item, uid_targets))
 
-    # Summary
     summary = rewrite_xrefs(as_text(raw.get("summary")), uid_targets)
     if summary:
         parts += [summary, ""]
 
-    # Definition
     syntax = raw.get("syntax") or {}
     sig = as_text(syntax.get("content"))
     if sig:
@@ -752,7 +743,6 @@ def render_type_page(
     parts.extend(_render_type_inherited_members(item, uid_targets))
     parts.extend(_render_type_extension_methods(item, uid_targets))
 
-    # Remarks / Examples
     remarks = rewrite_xrefs(as_text(raw.get("remarks")), uid_targets)
     if remarks:
         parts += ["## Remarks", remarks, ""]
@@ -768,12 +758,6 @@ def render_type_page(
 
     return "\n".join(parts).rstrip() + "\n"
 
-
-# -----------------------------
-# Main
-# -----------------------------
-
-
 def _build_ns_graph(ns_to_types: dict[str, list[ItemInfo]]) -> dict[str, set[str]]:
     """Build a mapping of namespace to its child namespaces."""
     ns_children: dict[str, set[str]] = {}
@@ -786,7 +770,6 @@ def _build_ns_graph(ns_to_types: dict[str, list[ItemInfo]]) -> dict[str, set[str
             parent = ".".join(parts[:i])
             child = ".".join(parts[: i + 1])
             ns_children.setdefault(parent, set()).add(child)
-        # Ensure top-level exists
         ns_children.setdefault(parts[0], ns_children.get(parts[0], set()))
     return ns_children
 
@@ -803,17 +786,23 @@ def _write_type_pages(
     total_types = len(type_items)
     print(f"Writing {total_types} type pages...")
     for it in type_items:
-        use_global = _should_use_global_dir(it.namespace)
-        page_path = page_path_for_fullname(
-            args.api_root,
-            it.full_name,
-            use_global_dir=use_global,
-        )
+        target = uid_targets.get(it.uid)
+        if not target:
+            use_global = _should_use_global_dir(it.namespace)
+            page_path = page_path_for_fullname(
+                args.api_root,
+                it.full_name,
+                use_global_dir=use_global,
+            )
+        else:
+            page_path = target.page_path
+
         md = render_type_page(
             it,
             uid_to_item=uid_to_item,
             uid_targets=uid_targets,
             include_member_details=args.include_member_details,
+            canonical_path=page_path
         )
         out_file = output_file_for_page(out_root, page_path)
         out_file.write_text(md, encoding="utf-8")
@@ -822,7 +811,6 @@ def _write_type_pages(
             print(f"  ... wrote {written}/{total_types} types")
     return written
 
-
 def run_conversion(args: argparse.Namespace) -> int:
     """Execute the conversion logic."""
     yml_files = sorted(args.yml_dir.rglob("*.yml"))
@@ -830,13 +818,63 @@ def run_conversion(args: argparse.Namespace) -> int:
         msg = f"No .yml files found under: {args.yml_dir}"
         raise SystemExit(msg)
 
+    # 1. Configuration & Infra
+    config = load_config(args.config)
+    if args.force_rebuild:
+        config["force_rebuild"] = True
+        
+    config_hash = compute_config_hash(config)
+    
+    map_path = args.out_dir / "global_namespace_map.json"
+    global_map = GlobalNamespaceMap(str(map_path), config_hash)
+    global_map.load(accept_legacy=args.accept_legacy_cache)
+
+    # 2. Build Index
     uid_to_item, uid_to_ref = build_index(yml_files)
-    uid_targets = build_link_targets(uid_to_item, uid_to_ref, args.api_root)
+    
+    # 3. Analyze
+    tokenizer = Tokenizer(config.get("acronyms"))
+    sanitizer = Sanitizer(config.get("acronyms"))
+    metadata_index = MetadataIndex(uid_to_item)
+    analyzer = Analyzer(tokenizer, sanitizer, metadata_index, config)
+    analyzer.analyze(list(uid_to_item.values()))
+    
+    # 4. Resolve Global Items
+    resolver = GlobalPathResolver(analyzer, global_map, config)
+    report = ClusterReport(config_hash, CURRENT_SCHEMA_VERSION)
+    global_resolved: Dict[str, ResolutionResult] = {}
+    
+    for uid, item in uid_to_item.items():
+        if is_type_kind(item.kind) and _should_use_global_dir(item.namespace):
+            # Check old path for stubs (before update)
+            old_path = global_map.lookup(uid)
+            
+            res = resolver.resolve(item)
+            global_resolved[uid] = res
+            report.add_result(res)
+            
+            # Generate Stub if changed
+            if old_path and old_path != res.final_path:
+                stub_gen = StubGenerator(str(args.out_dir / args.api_root.lstrip("/")))
+                stub_gen.generate_stub(old_path, res.final_path, uid)
+
+    # 5. Build Link Targets (using resolved paths)
+    uid_targets = build_link_targets(uid_to_item, uid_to_ref, args.api_root, global_resolved)
+
+    # 6. Reporting & Dry Run
+    if args.dry_run:
+        report.generate_report("cluster_report.json")
+        print("Dry run complete. Report generated at cluster_report.json")
+        return 0
+        
+    # 7. Save Cache
+    threshold = config["thresholds"].get("stale_prune_after_runs", 0) if args.prune_stale else 0
+    global_map.save(prune_stale_threshold=threshold)
 
     out_root = args.out_dir.resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
-    # Collect types by namespace for optional namespace pages
+    # 8. Render Pages
     ns_to_types: dict[str, list[ItemInfo]] = {}
     for it in uid_to_item.values():
         if is_type_kind(it.kind):
@@ -846,7 +884,6 @@ def run_conversion(args: argparse.Namespace) -> int:
     ns_children = _build_ns_graph(ns_to_types)
     written = _write_type_pages(uid_to_item, uid_targets, args, out_root)
 
-    # Namespace pages (optional)
     if args.include_namespace_pages:
         for ns, types in sorted(ns_to_types.items(), key=lambda kv: kv[0].lower()):
             if not ns:
@@ -864,7 +901,6 @@ def run_conversion(args: argparse.Namespace) -> int:
             out_file.write_text(md, encoding="utf-8")
             written += 1
 
-    # Home page (optional)
     if args.home_page:
         home = [
             "# Home",
@@ -874,14 +910,13 @@ def run_conversion(args: argparse.Namespace) -> int:
                 "editable."
             ),
             "",
-            f"- Browse the API under `{args.api_root}`",
+            f"- Browse the API under `{{args.api_root}}`",
             "",
         ]
         (out_root / "home.md").write_text("\n".join(home), encoding="utf-8")
 
     print(f"Generated {written} Markdown pages into: {out_root}")
     return 0
-
 
 def main() -> int:
     """Run the conversion process."""
@@ -920,6 +955,30 @@ def main() -> int:
         "--home-page",
         action="store_true",
         help="Generate a simple Home page (home.md)",
+    )
+    ap.add_argument(
+        "--config",
+        help="Path to configuration file",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Analyze and generate report without writing files",
+    )
+    ap.add_argument(
+        "--force-rebuild",
+        action="store_true",
+        help="Ignore cache and rebuild all clusters",
+    )
+    ap.add_argument(
+        "--prune-stale",
+        action="store_true",
+        help="Remove stale entries from cache",
+    )
+    ap.add_argument(
+        "--accept-legacy-cache",
+        action="store_true",
+        help="Accept and migrate legacy cache formats",
     )
     args = ap.parse_args()
     return run_conversion(args)

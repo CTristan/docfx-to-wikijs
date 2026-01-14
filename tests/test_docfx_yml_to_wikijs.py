@@ -110,6 +110,8 @@ def test_namespace_of() -> None:
         parent=None,
         namespace="My.Ns",
         summary="",
+        inheritance=[],
+        implements=[],
         file=Path(),
         raw={},
     )
@@ -124,6 +126,8 @@ def test_namespace_of() -> None:
         parent=None,
         namespace=None,
         summary="",
+        inheritance=[],
+        implements=[],
         file=Path(),
         raw={},
     )
@@ -138,6 +142,8 @@ def test_namespace_of() -> None:
         parent=None,
         namespace=None,
         summary="",
+        inheritance=[],
+        implements=[],
         file=Path(),
         raw={},
     )
@@ -178,6 +184,8 @@ def test_build_link_targets() -> None:
             parent="My",
             namespace="My",
             summary="",
+            inheritance=[],
+            implements=[],
             file=Path(),
             raw={},
         ),
@@ -189,6 +197,8 @@ def test_build_link_targets() -> None:
             parent="My.Class",
             namespace="My",
             summary="",
+            inheritance=[],
+            implements=[],
             file=Path(),
             raw={},
         ),
@@ -228,6 +238,8 @@ def test_build_link_targets_global_namespace() -> None:
             parent=None,
             namespace=None,
             summary="",
+            inheritance=[],
+            implements=[],
             file=Path(),
             raw={},
         ),
@@ -331,6 +343,8 @@ def test_render_namespace_page() -> None:
             parent="My",
             namespace="My",
             summary="A summary.",
+            inheritance=[],
+            implements=[],
             file=Path(),
             raw={},
         ),
@@ -374,6 +388,8 @@ def test_render_type_page() -> None:
         parent="My",
         namespace="My",
         summary="Class summary.",
+        inheritance=["System.Object"],
+        implements=[],
         file=Path(),
         raw={
             "assemblies": ["MyAssembly"],
@@ -394,6 +410,8 @@ def test_render_type_page() -> None:
         parent="My.Class",
         namespace="My",
         summary="Method summary.",
+        inheritance=[],
+        implements=[],
         file=Path(),
         raw={
             "syntax": {
@@ -489,7 +507,7 @@ def test_main_integration(tmp_path: Path) -> None:
     # Verify output files
     assert (out / "home.md").exists()
     assert (out / "api/My/Class.md").exists()
-    assert (out / "api/Global/GlobalClass.md").exists()
+    assert (out / "api/Global/Misc/GlobalClass.md").exists()
     assert (out / "api/My.md").exists()
 
     # Verify content
@@ -497,7 +515,7 @@ def test_main_integration(tmp_path: Path) -> None:
     assert "# Class Class" in class_content
     assert "**Namespace:** [My](/api/My)" in class_content
 
-    global_content = (out / "api/Global/GlobalClass.md").read_text(encoding="utf-8")
+    global_content = (out / "api/Global/Misc/GlobalClass.md").read_text(encoding="utf-8")
     assert "# Class GlobalClass" in global_content
 
 
@@ -529,8 +547,8 @@ def test_main_integration_global_explicit_namespace(tmp_path: Path) -> None:
         ret = main()
         assert ret == 0
 
-    # Should be in Global/GlobalClass.md
-    assert (out / "api/Global/GlobalClass.md").exists()
+    # Should be in Global/Misc/GlobalClass.md
+    assert (out / "api/Global/Misc/GlobalClass.md").exists()
 
 
 def test_render_type_relationships() -> None:
@@ -552,6 +570,8 @@ def test_render_type_relationships() -> None:
         parent="My",
         namespace="My",
         summary="Summary",
+        inheritance=[],
+        implements=["InterfaceA", "UnknownInterface"],
         file=Path(),
         raw={
             # Implements (comma separated)

@@ -77,8 +77,10 @@ uv run python dev.py
 - **API Scope**: Private members are explicitly included in the generated API documentation (via `docfx.json` configuration) to provide full internal visibility of the game's codebase.
 - **Conversion Logic**: Modifications to the Wiki.js output format should be made in `src/docfx_yml_to_wikijs.py`.
 - **Output Naming**: Generated Markdown files use subdirectories for namespaces (e.g., `My/Namespace/Class.md`) instead of hyphenated filenames. Types in the global namespace are placed in a `Global/` subdirectory (e.g., `Global/MyClass.md`). Periods are replaced with hyphens within path segments for Wiki.js compatibility.
+- **Global Namespace Clustering**: The `Global` namespace is automatically subdivided into clusters (e.g., `Global/Story/`, `Global/UI/`) based on a deterministic precedence chain (Cache > Overrides > Metadata > Suffixes > Prefixes > etc.). This logic is handled by `src/global_path_resolver.py` and configured via `config.yml` (optional). A persistent cache (`global_namespace_map.json`) ensures path stability.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
+- **File Structure (src/)**: All Python files in the `src` folder must have only one public method, and the file must be named exactly the same as that public method.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
 - **Top-Level Imports (PLC0415)**: Avoid `import` statements outside of a module's top-level scope (e.g., inside functions). Place them at the top of the file to clarify dependencies and avoid hidden side effects, unless necessary for avoiding circular dependencies or deferred loading.
 - **Testing**: Avoid importing and testing private functions (prefixed with `_`) directly. Instead, test their functionality through the public API they support.

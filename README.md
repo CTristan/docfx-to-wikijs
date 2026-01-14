@@ -12,6 +12,7 @@ It utilizes **DocFX** to extract metadata from managed assemblies (DLLs) and a c
     *   Generates namespace landing pages.
     *   Includes full member details (constructors, methods, properties, fields).
     *   Sanitizes filenames for web compatibility.
+*   **Global Namespace Clustering**: Automatically organizes flat `Global` namespaces into meaningful subdirectories based on lexical analysis and inheritance metadata.
 
 ## Prerequisites
 
@@ -77,12 +78,49 @@ uv run python src/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-page
 *   `--include-member-details`: Includes inline details for methods, properties, etc., on the class page.
 *   `--home-page`: Generates a basic `home.md`.
 
+## Global Namespace Clustering
+
+The tool includes a robust clustering engine to organize the massive `Global` namespace often found in Unity games.
+
+### Features
+*   **Dynamic Clustering**: Analyzes type names and inheritance to group related types into subdirectories (e.g. `Global/Story/`, `Global/UI/`).
+*   **Stability**: Maintains a persistent cache (`global_namespace_map.json`) to ensure paths remain stable across runs.
+*   **Redirects**: Automatically generates Markdown stubs for any moved files to prevent broken links.
+*   **Configuration**: Fully configurable via YAML.
+
+### Configuration
+You can provide a configuration file via `--config`:
+```bash
+uv run python src/docfx_yml_to_wikijs.py ... --config config.yml
+```
+
+Example `config.yml`:
+```yaml
+thresholds:
+  min_cluster_size: 10
+  top_k: 20
+
+rules:
+  priority_suffixes: ["UI", "Editor"]
+  keyword_clusters:
+    Bosses: ["Boss"]
+  stop_tokens: ["Manager", "Data"]
+
+path_overrides:
+  "MyUID": "Global/Custom/Path.md"
+```
+
+### CLI Options
+*   `--dry-run`: Generate `cluster_report.json` without writing files.
+*   `--force-rebuild`: Ignore cache and rebuild clusters.
+*   `--prune-stale`: Remove stale cache entries.
+
 ## Project Structure
 
 *   **`assemblies/`**: Input directory for game assemblies (DLLs).
 *   **`api/`**: Intermediate output directory for DocFX YAML metadata.
 *   **`wikijs_out/`**: Final output directory containing Wiki.js-compatible Markdown.
-*   **`src/`**: Contains the conversion logic (`docfx_yml_to_wikijs.py`).
+*   **`src/`**: Contains the conversion logic.
 *   **`main.py`**: Orchestration script to run the full build process.
 *   **`docfx.json`**: Configuration file for DocFX.
 
