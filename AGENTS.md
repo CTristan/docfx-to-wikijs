@@ -59,7 +59,7 @@ docfx docfx.json --serve
 #### Wiki.js Conversion (Manual)
 To run the conversion script manually (assuming metadata in `api/` exists):
 ```bash
-uv run python src/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-pages --include-member-details --home-page
+uv run python -m src.docfx_yml_to_wikijs api wikijs_out --include-namespace-pages --include-member-details --home-page
 ```
 
 #### Python Environment
@@ -80,6 +80,8 @@ uv run python dev.py
 - **Global Namespace Clustering**: The `Global` namespace is automatically subdivided into clusters (e.g., `Global/Story/`, `Global/UI/`) based on a deterministic precedence chain (Cache > Overrides > Metadata > Suffixes > Prefixes > etc.). This logic is handled by `src/global_path_resolver.py` and configured via `config.yml` (optional). A persistent cache (`global_namespace_map.json`) ensures path stability.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
+- **Execution Model**: The application code in `src/` relies on relative imports. Therefore, scripts must be executed as modules (e.g., `python -m src.docfx_yml_to_wikijs`) rather than by file path, unless strict package bases are handled otherwise.
+- **Type Safety**: `mypy` is configured with `explicit_package_bases = true`. Ensure all imports are correctly resolved relative to the project root.
 - **File Structure (src/)**: All Python files in the `src` folder must have only one public method, and the file must be named exactly the same as that public method.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
 - **Top-Level Imports (PLC0415)**: Avoid `import` statements outside of a module's top-level scope (e.g., inside functions). Place them at the top of the file to clarify dependencies and avoid hidden side effects, unless necessary for avoiding circular dependencies or deferred loading.
