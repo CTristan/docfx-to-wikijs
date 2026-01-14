@@ -18,7 +18,7 @@ def resolver_deps() -> tuple[MagicMock, MagicMock, dict[str, Any]]:
     analyzer.tokenizer = tokenizer
     global_map = MagicMock()
     config = {
-        "thresholds": {"min_cluster_size": 2, "top_k": 5},
+        "thresholds": {"min_cluster_size": 1, "top_k": 5},
         "rules": {
             "priority_suffixes": ["UI"],
             "stop_tokens": [],

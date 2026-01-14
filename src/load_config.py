@@ -9,8 +9,11 @@ from src.deep_merge import deep_merge
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "thresholds": {
-        "min_cluster_size": 10,
+        "min_cluster_size": 3,
         "top_k": 20,
+        "max_top_level_folders": 40,
+        "max_folder_size": 250,
+        "min_family_size": 3,
         "max_depth": 2,
         "fragmentation_limit": 0.50,
         "stale_prune_after_runs": 5,
@@ -18,6 +21,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "rules": {
         "priority_suffixes": ["UI", "Editor"],
         "keyword_clusters": {},
+        "overflow_strategy": "reroute_to_best_kept",
+        "reroute_bias": "stability",
+        "pinned_allow_singleton": False,
+        "pinned_roots": [],
         "stop_tokens": [
             "Manager",
             "Controller",

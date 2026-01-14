@@ -3,7 +3,7 @@ name = "docfx"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 dependencies = [
     "mypy>=1.19.1",
@@ -12,12 +12,12 @@ dependencies = [
     "pytest-timeout>=2.4.0",
     "pyyaml>=6.0.3",
     "ruff>=0.14.10",
+    "semgrep>=1.132.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
 
 [tool.coverage.run]
 omit = [
-    "dev.py",
     "main.py",
 ]
 

@@ -24,6 +24,11 @@ def main() -> None:
         description="Generate DocFX metadata and Wiki.js documentation."
     )
     parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Run development checks (linting, tests) before generating documentation",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Analyze and generate report without writing files",
@@ -50,6 +55,15 @@ def main() -> None:
     args = parser.parse_args()
 
     root_dir = Path(__file__).parent
+
+    if args.dev:
+        print("--- Running Development Checks ---")
+        check_script = root_dir / "scripts" / "run_checks.sh"
+        run_command([str(check_script)])
+        print(
+            "\n✅ Development checks passed. "
+            "Proceeding with documentation generation.\n"
+        )
 
     # 1. Generate YAML metadata using dotnet docfx
     print("--- Step 1: Generating DocFX metadata ---")

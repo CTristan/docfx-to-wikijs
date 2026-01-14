@@ -105,20 +105,26 @@ def _resolve_global_paths(
     """Resolve target paths for items in the global namespace."""
     resolver = GlobalPathResolver(analyzer, global_map, config)
     report = ClusterReport(compute_config_hash(config), CURRENT_SCHEMA_VERSION)
-    global_resolved: dict[str, ResolutionResult] = {}
+
+    # Collect items needing resolution
+    global_items = [
+        it
+        for it in uid_to_item.values()
+        if is_type_kind(it.kind) and should_use_global_dir(it.namespace)
+    ]
+
+    # Resolve all at once
+    global_resolved = resolver.resolve_all(global_items)
 
     stub_root = args.out_dir / args.api_root.lstrip("/")
     stub_gen = StubGenerator(str(stub_root))
 
-    for uid, item in uid_to_item.items():
-        if is_type_kind(item.kind) and should_use_global_dir(item.namespace):
-            old_path = global_map.lookup(uid)
-            res = resolver.resolve(item)
-            global_resolved[uid] = res
-            report.add_result(res)
+    for uid, res in global_resolved.items():
+        old_path = global_map.lookup(uid)
+        report.add_result(res)
 
-            if not args.dry_run and old_path and old_path != res.final_path:
-                stub_gen.generate_stub(old_path, res.final_path, uid)
+        if not args.dry_run and old_path and old_path != res.final_path:
+            stub_gen.generate_stub(old_path, res.final_path, uid)
 
     if args.dry_run:
         report.generate_report("cluster_report.json")

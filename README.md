@@ -19,7 +19,7 @@ It utilizes **DocFX** to extract metadata from managed assemblies (DLLs) and a c
 *   **Game Assemblies (DLLs)**: The project requires the game's managed assemblies (specifically `Assembly-CSharp.dll` and relevant Unity libraries) to be placed in the `assemblies/` directory.
     *   *Hint:* These are typically found in the game's installation folder under `{GameName}_Data\Managed\`.
     *   *Example (Lobotomy Corporation):* `C:\Program Files (x86)\Steam\steamapps\common\LobotomyCorp\LobotomyCorp_Data\Managed\`
-*   **Python 3.12+**
+*   **Python 3.14+**
 *   **[uv](https://github.com/astral-sh/uv)** (for Python dependency management)
 *   **[DocFX](https://dotnet.github.io/docfx/)**
     *   Install via .NET CLI: `dotnet tool install -g docfx`
@@ -126,18 +126,18 @@ path_overrides:
 
 ## Development
 
-This project uses `ruff` for linting and formatting, `mypy` for static type checking, and `pytest` for unit testing. A convenience script `dev.py` is provided to run the full pipeline in sequence.
+This project uses `ruff` for linting and formatting, `mypy` for static type checking, and `pytest` for unit testing. The `main.py` script includes a `--dev` flag to run these checks before building.
 
 ```bash
 # Run Development Pipeline (Format -> Lint -> Type Check -> Test -> Main Build)
-uv run python dev.py
+uv run python main.py --dev
 ```
 
 To run only the checks and tests (useful for CI):
 
 ```bash
 # Run CI Checks (Format -> Lint -> Type Check -> Test)
-uv run python dev.py --ci
+./scripts/run_checks.sh
 ```
 
 Or run tools individually:

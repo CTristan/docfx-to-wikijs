@@ -7,6 +7,7 @@ from typing import Any
 from src.analyzer import Analyzer
 from src.global_namespace_map import GlobalNamespaceMap
 from src.item_info import ItemInfo
+from src.normalization_pass import NormalizationPass
 from src.resolution_result import ResolutionResult
 
 
@@ -43,49 +44,130 @@ class GlobalPathResolver:
         self.hub_types = config.get("hub_types", {})
         self.acronyms = set(config.get("acronyms", []))
 
-    def resolve(self, item: ItemInfo) -> ResolutionResult:
-        """Resolve a single item to its final clustered path."""
-        # 1. Cache Check
-        if not self.config.get("force_rebuild", False):
-            cached_path = self.global_map.lookup(item.uid)
-            if cached_path:
-                return self._finalize_resolution(
-                    item.uid, cached_path, ("cache", 1.0, "cache")
-                )
-
-        # 2. Overrides
-        overrides = self.config.get("path_overrides", {})
-        if item.uid in overrides:
-            return self._finalize_resolution(
-                item.uid, overrides[item.uid], ("override_uid", 1.0, "override")
-            )
-        if item.full_name in overrides:
-            return self._finalize_resolution(
-                item.uid, overrides[item.full_name], ("override_name", 1.0, "override")
-            )
-
-        # Apply Rules
-        candidates = self._apply_rules(item)
-
-        if not candidates:
-            # Fallback to Misc
-            winning = ("misc", "Misc", 0.1)
-            runners_up = []
-        else:
-            winning = candidates[0]
-            runners_up = [
-                {"rule": c[0], "key": c[1], "score": c[2]} for c in candidates[1:]
-            ]
-
-        rule_id, cluster_key, score = winning
-
-        # Construct Path
-        safe_name = self.sanitizer.normalize(item.name)
-        path = f"Global/{cluster_key}/{safe_name}.md"
-
-        return self._finalize_resolution(
-            item.uid, path, (rule_id, score, cluster_key), runners_up
+    def resolve_all(self, items: list[ItemInfo]) -> dict[str, ResolutionResult]:
+        """Resolve all items at once, applying normalization pass."""
+        # 1. Initial clustering
+        items_by_uid = {it.uid: it for it in items}
+        initial_assignments, original_signals, cached_results = (
+            self._apply_initial_clustering(items)
         )
+
+        # 2. Normalization Pass
+        norm_pass = NormalizationPass(
+            self.config, self.sanitizer, self.analyzer.tokenizer
+        )
+        to_normalize = initial_assignments  # Only contains items needing normalization
+
+        final_keys = norm_pass.run(to_normalize, items_by_uid, original_signals)
+
+        # 3. Finalize
+        return self._finalize_results(
+            final_keys,
+            items_by_uid,
+            original_signals,
+            initial_assignments,
+            cached_results,
+        )
+
+    def _apply_initial_clustering(
+        self, items: list[ItemInfo]
+    ) -> tuple[
+        dict[str, tuple[str, str]],
+        dict[str, list[tuple[str, str, float]]],
+        dict[str, ResolutionResult],
+    ]:
+        """Run initial rule application and separate cached items."""
+        initial_assignments: dict[str, tuple[str, str]] = {}
+        original_signals: dict[str, list[tuple[str, str, float]]] = {}
+        cached_results: dict[str, ResolutionResult] = {}
+
+        for item in items:
+            # 1.1 Cache Check
+            if not self.config.get("force_rebuild", False):
+                cached_path = self.global_map.lookup(item.uid)
+                if cached_path:
+                    cached_root = ""
+                    parts = cached_path.split("/")
+                    if len(parts) > 1:
+                        cached_root = parts[1]
+
+                    cached_results[item.uid] = self._finalize_resolution(
+                        item.uid, cached_path, ("cache", 1.0, "cache"), [], cached_root
+                    )
+                    continue
+
+            # 1.2 Overrides
+            overrides = self.config.get("path_overrides", {})
+            if item.uid in overrides:
+                cached_results[item.uid] = self._finalize_resolution(
+                    item.uid,
+                    overrides[item.uid],
+                    ("override_uid", 1.0, "override"),
+                    [],
+                    "",
+                )
+                continue
+            if item.full_name in overrides:
+                cached_results[item.uid] = self._finalize_resolution(
+                    item.uid,
+                    overrides[item.full_name],
+                    ("override_name", 1.0, "override"),
+                    [],
+                    "",
+                )
+                continue
+
+            # 1.3 Apply Rules
+            candidates = self._apply_rules(item)
+            original_signals[item.uid] = candidates
+
+            if not candidates:
+                initial_assignments[item.uid] = ("misc", "Misc")
+            else:
+                winning = candidates[0]
+                initial_assignments[item.uid] = (winning[0], winning[1])
+
+        return initial_assignments, original_signals, cached_results
+
+    def _finalize_results(
+        self,
+        final_keys: dict[str, str],
+        items_by_uid: dict[str, ItemInfo],
+        original_signals: dict[str, list[tuple[str, str, float]]],
+        initial_assignments: dict[str, tuple[str, str]],
+        cached_results: dict[str, ResolutionResult],
+    ) -> dict[str, ResolutionResult]:
+        """Combine cached results with normalized results."""
+        results = cached_results.copy()
+
+        for uid, cluster_key in final_keys.items():
+            item = items_by_uid[uid]
+            rule_id = "normalized"
+            score = 0.5
+
+            # Find the original rule that matched this cluster_key if possible
+            for r_id, k, s in original_signals.get(uid, []):
+                if k == cluster_key:
+                    rule_id = r_id
+                    score = s
+                    break
+
+            # Construct Path
+            safe_name = self.sanitizer.normalize(item.name)
+            path = f"Global/{cluster_key}/{safe_name}.md"
+
+            # Initial root for metrics
+            _initial_rule_id, initial_cluster_key = initial_assignments[uid]
+
+            results[uid] = self._finalize_resolution(
+                uid, path, (rule_id, score, cluster_key), [], initial_cluster_key
+            )
+
+        return results
+
+    def resolve(self, item: ItemInfo) -> ResolutionResult:
+        """Resolve a single item. (Legacy compatibility, use resolve_all)."""
+        return self.resolve_all([item])[item.uid]
 
     def _apply_rules(self, item: ItemInfo) -> list[tuple[str, str, float]]:
         """Return list of (rule_id, cluster_key, score) in precedence order."""
@@ -144,7 +226,7 @@ class GlobalPathResolver:
     ) -> None:
         """Apply type family rules based on shared prefixes."""
         min_family_len = 4
-        min_family_count = 2
+        min_family_count = self.config["thresholds"].get("min_family_size", 3)
         if norm_tokens:
             first = norm_tokens[0]
             if len(first) >= min_family_len:
@@ -201,6 +283,7 @@ class GlobalPathResolver:
         path: str,
         result_info: tuple[str, float, str],
         runner_ups: list[dict] | None = None,
+        initial_root: str = "",
     ) -> ResolutionResult:
         """Finalize the resolution result and update registries."""
         rule, score, cluster_key = result_info
@@ -221,7 +304,9 @@ class GlobalPathResolver:
                 continue
             self.folders.add(self._to_canonical_path(str(parent)))
 
-        return ResolutionResult(uid, final_path, rule, score, cluster_key, runner_ups)
+        return ResolutionResult(
+            uid, final_path, rule, score, cluster_key, runner_ups, initial_root
+        )
 
     def _resolve_collisions(self, uid: str, desired_path: str) -> str:
         """Resolve path collisions between files and folders."""

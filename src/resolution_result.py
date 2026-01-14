@@ -13,3 +13,4 @@ class ResolutionResult:
     score: float
     cluster_key: str
     ambiguity: list[dict] = field(default_factory=list)
+    initial_root: str = ""  # Pre-normalization root
