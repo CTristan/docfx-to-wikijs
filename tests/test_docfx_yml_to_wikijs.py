@@ -4,28 +4,26 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from docfx_yml_to_wikijs import (
-    ItemInfo,
-    LinkTarget,
-    as_text,
-    build_link_targets,
-    dot_safe,
-    header_slug,
-    is_member_kind,
-    is_namespace_kind,
-    is_type_kind,
-    iter_main_items,
-    load_managed_reference,
-    main,
-    md_codeblock,
-    md_table,
-    namespace_of,
-    page_path_for_fullname,
-    render_namespace_page,
-    render_type_page,
-    rewrite_xrefs,
-    strip_yaml_mime_header,
-)
+from src.as_text import as_text
+from src.build_link_targets import build_link_targets
+from src.docfx_yml_to_wikijs import main
+from src.dot_safe import dot_safe
+from src.header_slug import header_slug
+from src.is_member_kind import is_member_kind
+from src.is_namespace_kind import is_namespace_kind
+from src.is_type_kind import is_type_kind
+from src.item_info import ItemInfo
+from src.iter_main_items import iter_main_items
+from src.link_target import LinkTarget
+from src.load_managed_reference import load_managed_reference
+from src.md_codeblock import md_codeblock
+from src.md_table import md_table
+from src.namespace_of import namespace_of
+from src.page_path_for_fullname import page_path_for_fullname
+from src.render_namespace_page import render_namespace_page
+from src.render_type_page import render_type_page
+from src.rewrite_xrefs import rewrite_xrefs
+from src.strip_yaml_mime_header import strip_yaml_mime_header
 
 
 def test_strip_yaml_mime_header() -> None:
@@ -515,7 +513,8 @@ def test_main_integration(tmp_path: Path) -> None:
     assert "# Class Class" in class_content
     assert "**Namespace:** [My](/api/My)" in class_content
 
-    global_content = (out / "api/Global/Misc/GlobalClass.md").read_text(encoding="utf-8")
+    global_path = out / "api/Global/Misc/GlobalClass.md"
+    global_content = global_path.read_text(encoding="utf-8")
     assert "# Class GlobalClass" in global_content
 
 

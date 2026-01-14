@@ -22,6 +22,6 @@ omit = [
 ]
 
 [tool.mypy]
-mypy_path = "src"
+mypy_path = "."
 explicit_package_bases = true
 exclude = ["^tests/"]

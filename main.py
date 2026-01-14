@@ -28,7 +28,6 @@ def main() -> None:
 
     # 2. Convert YAML to Wiki.js Markdown
     print("\n--- Step 2: Converting YAML to Wiki.js Markdown ---")
-    script_path = root_dir / "src" / "docfx_yml_to_wikijs.py"
     yml_dir = root_dir / "api"
     out_dir = root_dir / "wikijs_out"
 
@@ -37,7 +36,8 @@ def main() -> None:
 
     cmd = [
         python_exe,
-        str(script_path),
+        "-m",
+        "src.docfx_yml_to_wikijs",
         str(yml_dir),
         str(out_dir),
         "--include-namespace-pages",
