@@ -10,7 +10,7 @@ RE_TITLE_CASE = re.compile(r"([A-Z][a-z]+)")
 RE_DIGITS = re.compile(r"([0-9]+)")
 RE_DIGIT_ACRONYM = re.compile(r"([0-9]+[A-Z]+)(?![a-z])")
 RE_DIGIT_MIXED = re.compile(r"([0-9]+[a-zA-Z]+?)(?=[A-Z][a-z]|$)")
-RE_UPPER_DIGIT_RUN = re.compile(r"([A-Z0-9]+)")
+RE_UPPER_DIGIT_RUN = re.compile(r"([A-Z0-9]+?)(?=[A-Z][a-z]|$)")
 RE_LOWER_RUN = re.compile(r"([a-z]+)")
 
 
