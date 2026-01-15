@@ -17,7 +17,7 @@ This project is a documentation site generator for the Unity game *Lobotomy Corp
 
 ### Prerequisites
 - **DocFX**: Required to generate metadata (`dotnet docfx`).
-- **Python 3.12+**: Required for the Python tooling.
+- **Python 3.14+**: Required for the Python tooling.
 - **uv**: Recommended for managing Python dependencies.
 - **ripgrep**: Available via the `rg` command for fast searching.
 
@@ -32,17 +32,17 @@ uv run python main.py
 #### Development Cycle (Recommended)
 To run the full development pipeline (Auto-fix -> Linting -> Type Checking -> Build):
 ```bash
-uv run python dev.py
+uv run python main.py --dev
 ```
 
-To run only the verification steps (Linting -> Type Checking -> Tests) without the build or auto-fixing:
+To run only the verification steps (Linting -> Type Checking -> Tests):
 ```bash
-uv run python dev.py --ci
+./scripts/run_checks.sh
 ```
 
 #### Continuous Integration
 The project uses GitHub Actions for CI. The workflow is defined in `.github/workflows/ci-gate.yml` and performs the following checks on Pull Requests:
-1.  **Setup**: Installs Python 3.12 and `uv`.
+1.  **Setup**: Installs Python 3.14 and `uv`.
 2.  **Dependencies**: Installs dependencies using `uv sync --frozen`.
 3.  **Verification**: Runs `./scripts/ci-gate.sh` directly (strict check mode).
 4.  **Artifacts**: Uploads coverage reports.
@@ -59,7 +59,7 @@ docfx docfx.json --serve
 #### Wiki.js Conversion (Manual)
 To run the conversion script manually (assuming metadata in `api/` exists):
 ```bash
-uv run python src/docfx_yml_to_wikijs.py api wikijs_out --include-namespace-pages --include-member-details --home-page
+uv run python -m src.docfx_yml_to_wikijs api wikijs_out --include-namespace-pages --include-member-details --home-page
 ```
 
 #### Python Environment
@@ -69,7 +69,7 @@ To set up and run the Python environment:
 uv sync
 
 # Run the development script (wraps ruff, mypy, and main.py)
-uv run python dev.py
+uv run python main.py --dev
 ```
 
 ## Conventions
@@ -77,13 +77,18 @@ uv run python dev.py
 - **API Scope**: Private members are explicitly included in the generated API documentation (via `docfx.json` configuration) to provide full internal visibility of the game's codebase.
 - **Conversion Logic**: Modifications to the Wiki.js output format should be made in `src/docfx_yml_to_wikijs.py`.
 - **Output Naming**: Generated Markdown files use subdirectories for namespaces (e.g., `My/Namespace/Class.md`) instead of hyphenated filenames. Types in the global namespace are placed in a `Global/` subdirectory (e.g., `Global/MyClass.md`). Periods are replaced with hyphens within path segments for Wiki.js compatibility.
+- **Global Namespace Clustering**: The `Global` namespace is automatically subdivided into "concept-first" clusters (e.g., `Global/Story/`, `Global/UI/`) to prioritize human navigability. This logic is handled by `src/global_path_resolver.py` and follows a deterministic precedence chain (Cache > Overrides > Metadata > Suffixes > Prefixes > etc.) coupled with a post-clustering normalization pass. This pass merges micro-variants and reroutes items from suppressed/overflow clusters into the nearest "kept" concept bucket based on semantic signals, minimizing click fatigue and avoiding meaningless catch-all indices. A persistent cache (`global_namespace_map.json`) ensures path stability across runs.
 - **Markdown**: General documentation is written in standard Markdown (e.g., `index.md`).
 - **Python Style**: Adhere to `ruff` and `mypy` standards for any Python scripts added to the project.
+- **Execution Model**: The application code in `src/` relies on relative imports. Therefore, scripts must be executed as modules (e.g., `python -m src.docfx_yml_to_wikijs`) rather than by file path, unless strict package bases are handled otherwise.
+- **Type Safety**: `mypy` is configured with `explicit_package_bases = true`. Ensure all imports are correctly resolved relative to the project root.
+- **File Structure (src/)**: All Python files in the `src` folder must have only one public method, and the file must be named exactly the same as that public method.
 - **Imports (E402)**: Imports must be at the top of the file, after module comments/docstrings. Exception: `sys.path` and `os.environ` modifications are allowed between imports.
 - **Top-Level Imports (PLC0415)**: Avoid `import` statements outside of a module's top-level scope (e.g., inside functions). Place them at the top of the file to clarify dependencies and avoid hidden side effects, unless necessary for avoiding circular dependencies or deferred loading.
 - **Testing**: Avoid importing and testing private functions (prefixed with `_`) directly. Instead, test their functionality through the public API they support.
 
 ## Gemini Added Memories
 - The user prefers to document breaking changes in `docs/decisions/` rather than complex migration paths for internal APIs.
-- The `scripts/run_checks.sh` script (referred to as `scripts/ci-gate.sh` in context) now runs ruff in check-only mode. `dev.py` handles the auto-fixing logic before calling the gate script, unless `--ci` is passed.
-- CI workflow (`.github/workflows/ci-gate.yml`) now invokes `./scripts/ci-gate.sh` directly instead of via `dev.py` to ensure strict checking without Python overhead.
+- The `scripts/run_checks.sh` script handles formatting, linting, and tests. It runs autofixing first, then stricter checks.
+- `dev.py` has been removed. Its functionality is merged into `main.py` via the `--dev` flag, which invokes `scripts/run_checks.sh`.
+- CI workflow (`.github/workflows/ci-gate.yml`) now invokes `./scripts/ci-gate.sh` directly to ensure strict checking without Python overhead.

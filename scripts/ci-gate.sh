@@ -1,25 +1,39 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo ""
-echo "--- Running Step: Ruff Formatting (Check) ---"
-echo "$ uv run ruff format --check"
-uv run ruff format --check
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "${repo_root}"
 
-echo ""
-echo "--- Running Step: Ruff Linting ---"
-echo "$ uv run ruff check"
-uv run ruff check
+run_step () {
+  local name="$1"
+  shift
+  echo
+  echo "Running ${name}..."
+  "$@"
+  echo "✅ ${name} passed"
+}
 
-echo ""
-echo "--- Running Step: Mypy Type Checking ---"
-echo "$ uv run mypy ."
-uv run mypy .
+echo "Running read-only CI checks..."
 
-echo ""
-echo "--- Running Step: Pytest Unit Tests ---"
-echo "$ uv run pytest"
-uv run pytest
+run_step \
+  "ruff format (check)" \
+  uv run --project "${repo_root}" --directory "${repo_root}" ruff format --check
 
-echo ""
-echo "✅ CI checks passed successfully."
+run_step \
+  "ruff check" \
+  uv run --project "${repo_root}" --directory "${repo_root}" ruff check
+
+run_step \
+  "mypy" \
+  uv run --project "${repo_root}" --directory "${repo_root}" mypy .
+
+run_step \
+  "semgrep" \
+  uv run --project "${repo_root}" --directory "${repo_root}" semgrep scan --config=auto --quiet --error
+
+run_step \
+  "pytest" \
+  uv run --project "${repo_root}" --directory "${repo_root}" pytest
+
+echo
+echo "All checks passed."
