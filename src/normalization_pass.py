@@ -420,6 +420,10 @@ class NormalizationPass:
                 # Canonicalize
                 tokens = self.tokenizer.tokenize(cluster_key)
                 norm_name = canonicalize_root_name(tokens)
+
+                if norm_name not in self.union_find:
+                    continue
+
                 rep = self._find(norm_name)
 
                 if rep in kept_roots and rep not in candidates_by_tier[rule_id]:

@@ -150,6 +150,66 @@ def test_normalization_full_flow() -> None:
     print("test_normalization_full_flow passed!")
 
 
+def test_reroute_with_missing_roots() -> None:
+    """Verify rerouting handles signals pointing to non-existent roots safely."""
+    config = {
+        "thresholds": {"min_cluster_size": 2, "max_top_level_folders": 10},
+        "rules": {"pinned_roots": [], "pinned_allow_singleton": False},
+    }
+
+    pass_obj = NormalizationPass(config, MockSanitizer(), MockTokenizer())
+
+    # Only one item, one root 'Big'
+    items = [
+        ItemInfo(
+            "b1", "Class", "Big1", "Big1", None, None, "", [], [], Path("b1.yml"), {}
+        ),
+        ItemInfo(
+            "b2", "Class", "Big2", "Big2", None, None, "", [], [], Path("b2.yml"), {}
+        ),
+        ItemInfo(
+            "orphan",
+            "Class",
+            "Orphan",
+            "Orphan",
+            None,
+            None,
+            "",
+            [],
+            [],
+            Path("o.yml"),
+            {},
+        ),
+    ]
+    items_by_uid = {it.uid: it for it in items}
+
+    initial_assignments = {
+        "b1": ("prefix", "Big"),
+        "b2": ("prefix", "Big"),
+        "orphan": ("prefix", "Small"),  # 'Small' will be suppressed (size 1 < 2)
+    }
+
+    # Signals for 'orphan' include 'Phantom' which was never in initial_assignments
+    original_signals = {
+        "orphan": [
+            ("prefix", "Small", 0.8),
+            ("strong_prefix", "Phantom", 0.7),  # Phantom does not exist in roots
+            ("strong_prefix", "Big", 0.6),
+        ]
+    }
+
+    final = pass_obj.run(initial_assignments, items_by_uid, original_signals)
+
+    # 'Big' is kept (size 2).
+    # 'Small' is dropped (size 1).
+    # 'orphan' should be rerouted.
+    # 'Phantom' signal should be ignored (caused KeyError before fix).
+    # 'Big' is a valid candidate.
+
+    assert final["orphan"] == "Big"
+
+
 if __name__ == "__main__":
     test_normalization_merge_invariants()
     test_normalization_full_flow()
+    test_reroute_with_missing_roots()
