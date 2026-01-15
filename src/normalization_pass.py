@@ -336,8 +336,6 @@ class NormalizationPass:
 
         return False
 
-        return False
-
     def _apply_merges(
         self, initial_assignments: dict[str, tuple[str, str]]
     ) -> dict[str, str]:
@@ -449,7 +447,9 @@ class NormalizationPass:
             if best_rep:
                 final_assignments[uid] = best_rep
             else:
-                # Final fallback to Misc
+                # Explicit fallback: If we had signals but they all pointed to dropped
+                # roots, we default to Misc. This is intended behavior to avoid
+                # reviving small/noisy roots.
                 final_assignments[uid] = "Misc"
 
         return final_assignments

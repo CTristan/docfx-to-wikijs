@@ -316,7 +316,7 @@ class GlobalPathResolver:
         if lower_base in self.folders:
             desired_path = f"{base_no_ext}_Page.md"
             base_no_ext = str(Path(desired_path).with_suffix(""))
-            lower_base = self._to_canonical_path(base_no_ext)
+            self._to_canonical_path(base_no_ext)
 
         p = Path(desired_path)
         for parent in p.parents:

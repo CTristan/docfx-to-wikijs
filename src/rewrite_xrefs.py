@@ -4,7 +4,7 @@ import re
 
 from src.link_target import LinkTarget
 
-XREF_TAG_RE = re.compile(r"<xref:([^?>#>]+)(?:\?[^>#>]*)?(?:#[^>]*)?>")
+XREF_TAG_RE = re.compile(r"<xref:([^?>#]+)(?:\?[^>#]*)?(?:#[^>]*)?>")
 XREF_MD_LINK_RE = re.compile(
     r"\((xref:([^)?#]+)(?:\?[^)#]*)?(?:#[^)]+)?)\)",
 )  # (xref:UID?...)

@@ -2,6 +2,17 @@
 
 import re
 
+# Pre-compiled regex patterns for tokenization
+RE_STRIP_ARITY = re.compile(r"`\d+")
+RE_SPLIT_SEPARATORS = re.compile(r"[+_]")
+RE_ACRONYM_HEAD = re.compile(r"([A-Z]{2,}[0-9]*)(?![a-z])")
+RE_TITLE_CASE = re.compile(r"([A-Z][a-z]+)")
+RE_DIGITS = re.compile(r"([0-9]+)")
+RE_DIGIT_ACRONYM = re.compile(r"([0-9]+[A-Z]+)(?![a-z])")
+RE_DIGIT_MIXED = re.compile(r"([0-9]+[a-zA-Z]+?)(?=[A-Z][a-z]|$)")
+RE_UPPER_DIGIT_RUN = re.compile(r"([A-Z0-9]+)")
+RE_LOWER_RUN = re.compile(r"([a-z]+)")
+
 
 class Tokenizer:
     """Splits CamelCase, underscored, and generic identifiers into tokens."""
@@ -13,11 +24,11 @@ class Tokenizer:
     def tokenize(self, text: str) -> list[str]:
         """Split a full identifier string into a list of tokens."""
         # Strip generic arity `1
-        text = re.sub(r"`\d+", "", text)
+        text = RE_STRIP_ARITY.sub("", text)
 
         tokens = []
         # Split by nested type '+' and underscore '_'
-        parts = re.split(r"[+_]", text)
+        parts = RE_SPLIT_SEPARATORS.split(text)
         for part in parts:
             if part:
                 tokens.extend(self._split_camel_case(part))
@@ -39,19 +50,19 @@ class Tokenizer:
         while i < n:
             # 1. Acronyms (2+ caps) with optional trailing digits
             # We use (?![a-z]) to avoid consuming the start of a TitleCase word
-            match = re.match(r"([A-Z]{2,}[0-9]*)(?![a-z])", text[i:])
+            match = RE_ACRONYM_HEAD.match(text, i)
             if match:
                 tokens.append(match.group(1))
-                i += match.end()
+                i = match.end()
                 continue
 
             # 2. TitleCase words with optional trailing digits
-            match = re.match(r"([A-Z][a-z]+)", text[i:])
+            match = RE_TITLE_CASE.match(text, i)
             if match:
                 word = match.group(0)
                 next_pos = i + len(word)
                 # Match optional digits
-                digit_match = re.match(r"([0-9]+)", text[next_pos:])
+                digit_match = RE_DIGITS.match(text, next_pos)
                 if digit_match:
                     digits = digit_match.group(0)
                     # Check if digits are followed by an uppercase letter
@@ -73,32 +84,32 @@ class Tokenizer:
 
             # 3. Leading digits followed by letters
             # Try digits + uppercase acronym style (e.g. 2D)
-            match = re.match(r"([0-9]+[A-Z]+)(?![a-z])", text[i:])
+            match = RE_DIGIT_ACRONYM.match(text, i)
             if match:
                 tokens.append(match.group(1))
-                i += match.end()
+                i = match.end()
                 continue
 
             # Try digits + mixed letters (e.g. 2dxFX), stopping before TitleCase
             # boundary
-            match = re.match(r"([0-9]+[a-zA-Z]+?)(?=[A-Z][a-z]|$)", text[i:])
+            match = RE_DIGIT_MIXED.match(text, i)
             if match:
                 tokens.append(match.group(1))
-                i += match.end()
+                i = match.end()
                 continue
 
             # 4. Standalone digits or other remaining uppercase runs
-            match = re.match(r"([A-Z0-9]+)", text[i:])
+            match = RE_UPPER_DIGIT_RUN.match(text, i)
             if match:
                 tokens.append(match.group(1))
-                i += match.end()
+                i = match.end()
                 continue
 
             # 5. Standalone lowercase runs (e.g. 'm' in m_Score)
-            match = re.match(r"([a-z]+)", text[i:])
+            match = RE_LOWER_RUN.match(text, i)
             if match:
                 tokens.append(match.group(1))
-                i += match.end()
+                i = match.end()
                 continue
 
             # Fallback for unexpected characters
